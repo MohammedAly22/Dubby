@@ -64,12 +64,12 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
   <tr><td><img src="assets/egypt.jpg" width="22" /> <b>Arabic</b> (spoken)</td><td align="center">✅</td><td align="center">—</td><td>Cohere Arabic › QwenCleo › CohereX › Qwen3-ASR › WhisperX › Metro</td><td align="center">—</td><td align="right">—</td></tr>
   <tr><td><img src="assets/egypt.jpg" width="22" /> <b>Egyptian Arabic</b> · مصري</td><td align="center">—</td><td align="center">✅</td><td align="center">—</td><td>VoiceTut › Lahgtna › OmniVoice</td><td align="right">23 h</td></tr>
   <tr><td><img src="assets/KSA.jpg" width="22" /> <b>Modern Standard Arabic</b> · فصحى</td><td align="center">—</td><td align="center">✅</td><td align="center">—</td><td>Lahgtna › VoiceTut › OmniVoice</td><td align="right">1.5 k h</td></tr>
-  <tr><td><img src="assets/spain.png" width="22" /> <b>Spanish</b> · Español</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Parakeet › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">27.6 k h</td></tr>
-  <tr><td><img src="assets/france.png" width="22" /> <b>French</b> · Français</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Parakeet › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">23.7 k h</td></tr>
-  <tr><td><img src="assets/italy.png" width="22" /> <b>Italian</b> · Italiano</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Parakeet › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">9.4 k h</td></tr>
-  <tr><td><img src="assets/india.png" width="22" /> <b>Hindi</b> · हिन्दी</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › WhisperX</td><td><b>IndicF5</b> › OmniVoice</td><td align="right">⚠️ 117 h</td></tr>
-  <tr><td><img src="assets/china.png" width="22" /> <b>Chinese</b> · 中文</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">111 k h</td></tr>
-  <tr><td><img src="assets/japan.png" width="22" /> <b>Japanese</b> · 日本語</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › WhisperX (Kotoba-Whisper) › Cohere</td><td>OmniVoice › Qwen3-TTS</td><td align="right">37 k h</td></tr>
+  <tr><td><img src="assets/Spain.png" width="22" /> <b>Spanish</b> · Español</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Parakeet › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">27.6 k h</td></tr>
+  <tr><td><img src="assets/France.png" width="22" /> <b>French</b> · Français</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Parakeet › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">23.7 k h</td></tr>
+  <tr><td><img src="assets/Italy.png" width="22" /> <b>Italian</b> · Italiano</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Parakeet › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">9.4 k h</td></tr>
+  <tr><td><img src="assets/India.png" width="22" /> <b>Hindi</b> · हिन्दी</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › WhisperX</td><td><b>IndicF5</b> › OmniVoice</td><td align="right">⚠️ 117 h</td></tr>
+  <tr><td><img src="assets/China.jpg" width="22" /> <b>Chinese</b> · 中文</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › Cohere › WhisperX</td><td>OmniVoice › Qwen3-TTS</td><td align="right">111 k h</td></tr>
+  <tr><td><img src="assets/Japan.png" width="22" /> <b>Japanese</b> · 日本語</td><td align="center">✅</td><td align="center">✅</td><td>Qwen3-ASR › WhisperX (Kotoba-Whisper) › Cohere</td><td>OmniVoice › Qwen3-TTS</td><td align="right">37 k h</td></tr>
 </table>
 
 ### 🔁 Translation recommendations
@@ -78,9 +78,9 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
 | :-- | :-- | :-- |
 | English/Arabic → <img src="assets/egypt.jpg" width="16" /> Egyptian | **Emhotob-50M** › Masrawy › Jisr › LLM › NLLB | Purpose-built Egyptian translators by oddadmix |
 | English/Arabic → <img src="assets/KSA.jpg" width="16" /> MSA | **Emhotob-50M** › Hunyuan-MT › Jisr › NLLB › LLM | Emhotob scores BLEU 46 on En→MSA |
-| English → <img src="assets/india.png" width="16" /> Hindi | **IndicTrans2** › Hunyuan-MT › NLLB › LLM | AI4Bharat's state-of-the-art English→Indic model |
-| Any → <img src="assets/spain.png" width="16" /> <img src="assets/france.png" width="16" /> <img src="assets/italy.png" width="16" /> <img src="assets/USA.jpg" width="16" /> | **Hunyuan-MT-7B** › LLM › NLLB | Hunyuan-MT won 30 of 31 WMT25 language pairs |
-| Any → <img src="assets/china.png" width="16" /> <img src="assets/japan.png" width="16" /> | **Hunyuan-MT-7B** › Qwen LLM › NLLB | Official Chinese prompt template; Qwen is also excellent for CJK |
+| English → <img src="assets/India.png" width="16" /> Hindi | **IndicTrans2** › Hunyuan-MT › NLLB › LLM | AI4Bharat's state-of-the-art English→Indic model |
+| Any → <img src="assets/Spain.png" width="16" /> <img src="assets/France.png" width="16" /> <img src="assets/Italy.png" width="16" /> <img src="assets/USA.jpg" width="16" /> | **Hunyuan-MT-7B** › LLM › NLLB | Hunyuan-MT won 30 of 31 WMT25 language pairs |
+| Any → <img src="assets/China.jpg" width="16" /> <img src="assets/Japan.png" width="16" /> | **Hunyuan-MT-7B** › Qwen LLM › NLLB | Official Chinese prompt template; Qwen is also excellent for CJK |
 | Same language (e.g. en → en) | **Keep original text** | Re-voice a video without translating |
 
 > [!NOTE]
