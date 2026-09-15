@@ -1,0 +1,277 @@
+import { create } from 'zustand'
+import { api, wsUrl, type RunBody } from './api'
+import type { AsrPreviewSegment, EngineChoice, EngineInfo, JobsSnapshot, LogEvent, Project, ProjectSummary, Segment } from './types'
+import { debounceByKey } from './utils'
+
+export interface Toast {
+  id: number
+  kind: 'info' | 'success' | 'error'
+  message: string
+}
+
+interface StudioState {
+  connected: boolean
+  backendReachable: boolean
+  projects: ProjectSummary[]
+  project: Project | null
+  engines: EngineInfo[]
+  enginesLoading: boolean
+  families: Record<string, any>
+  jobs: JobsSnapshot | null
+  logs: LogEvent[]
+  toasts: Toast[]
+  asrPreview: { projectId: string; segments: AsrPreviewSegment[] } | null
+  selectedId: string | null
+  clipDraft: { start: number | null; end: number | null }
+  logsOpen: boolean
+  settingsOpen: boolean
+
+  connect: () => void
+  loadProjects: (silent?: boolean) => Promise<void>
+  openProject: (id: string, silent?: boolean) => Promise<void>
+  closeProject: () => void
+  loadEngines: (refresh?: boolean) => Promise<void>
+  toast: (message: string, kind?: Toast['kind']) => void
+  dismiss: (id: number) => void
+  select: (id: string | null) => void
+  setClipDraft: (draft: Partial<{ start: number | null; end: number | null }>) => void
+  setLogsOpen: (open: boolean) => void
+  setSettingsOpen: (open: boolean) => void
+
+  patchSettings: (patch: Record<string, unknown>) => void
+  saveChoice: (stage: 'asr' | 'translation' | 'tts', choice: EngineChoice) => void
+  runStage: (stage: string, body?: RunBody) => Promise<void>
+  cancelStage: (stage: string) => Promise<void>
+  updateSegment: (sid: string, patch: Partial<Pick<Segment, 'text' | 'translation' | 'start' | 'end'>>) => Promise<void>
+}
+
+let toastId = 0
+let socket: WebSocket | null = null
+let retry = 0
+let listTimer: ReturnType<typeof setTimeout> | null = null
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+let pollDelay = 2500
+
+/**
+ * HTTP polling fallback for proxies that block websockets (e.g. notebook tunnels).
+ * Backs off to 15 s while the backend is unreachable and never toasts.
+ */
+function startPolling() {
+  if (pollTimer) return
+  const tick = async () => {
+    pollTimer = null
+    const s = useStudio.getState()
+    if (s.connected) {
+      pollDelay = 2500
+      return
+    }
+    try {
+      const jobs = await api.jobs()
+      useStudio.setState({ jobs, backendReachable: true })
+      if (s.project) await s.openProject(s.project.id, true)
+      else await s.loadProjects(true)
+      pollDelay = 2500
+    } catch {
+      useStudio.setState({ backendReachable: false })
+      pollDelay = Math.min(pollDelay * 2, 15000)
+    }
+    pollTimer = setTimeout(tick, pollDelay)
+  }
+  pollTimer = setTimeout(tick, pollDelay)
+}
+
+const debouncedPatch = debounceByKey((pid: string, patch: Record<string, unknown>) => {
+  api.patchSettings(pid, patch).catch((e) => useStudio.getState().toast(e.message, 'error'))
+}, 450)
+
+export const useStudio = create<StudioState>((set, get) => ({
+  connected: false,
+  backendReachable: true,
+  projects: [],
+  project: null,
+  engines: [],
+  enginesLoading: false,
+  families: {},
+  jobs: null,
+  logs: [],
+  toasts: [],
+  asrPreview: null,
+  selectedId: null,
+  clipDraft: { start: null, end: null },
+  logsOpen: false,
+  settingsOpen: false,
+
+  connect: () => {
+    if (socket && socket.readyState <= 1) return
+    socket = new WebSocket(wsUrl())
+    socket.onopen = () => {
+      retry = 0
+      set({ connected: true, backendReachable: true })
+      api.logs().then((logs) => set({ logs })).catch(() => {})
+      const p = get().project
+      if (p) get().openProject(p.id)
+    }
+    socket.onclose = () => {
+      set({ connected: false })
+      startPolling()
+      retry = Math.min(retry + 1, 5)
+      setTimeout(() => get().connect(), Math.min(15000, 500 * 2 ** retry))
+    }
+    socket.onmessage = (msg) => handleEvent(JSON.parse(msg.data))
+  },
+
+  loadProjects: async (silent = false) => {
+    try {
+      set({ projects: await api.projects() })
+    } catch (e: any) {
+      if (silent) throw e
+      get().toast(e.message, 'error')
+    }
+  },
+
+  openProject: async (id, silent = false) => {
+    try {
+      const project = await api.project(id)
+      set((s) => ({ project, asrPreview: s.asrPreview?.projectId === id ? s.asrPreview : null }))
+    } catch (e: any) {
+      if (silent) throw e
+      get().toast(e.message, 'error')
+    }
+  },
+
+  closeProject: () => set({ project: null, asrPreview: null, selectedId: null }),
+
+  loadEngines: async (refresh = false) => {
+    set({ enginesLoading: true })
+    try {
+      const data = await api.engines(refresh)
+      set({ engines: data.engines, families: data.families })
+    } catch (e: any) {
+      get().toast(`Engines: ${e.message}`, 'error')
+    } finally {
+      set({ enginesLoading: false })
+    }
+  },
+
+  toast: (message, kind = 'info') => {
+    const id = ++toastId
+    set((s) => ({ toasts: [...s.toasts, { id, kind, message }] }))
+    setTimeout(() => get().dismiss(id), kind === 'error' ? 7000 : 4000)
+  },
+  dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  select: (id) => set({ selectedId: id }),
+  setClipDraft: (draft) => set((s) => ({ clipDraft: { ...s.clipDraft, ...draft } })),
+  setLogsOpen: (logsOpen) => set({ logsOpen }),
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+
+  patchSettings: (patch) => {
+    const p = get().project
+    if (!p) return
+    const merged = deepMerge(p.settings as any, patch)
+    set({ project: { ...p, settings: merged } })
+    debouncedPatch(`${p.id}:${Object.keys(patch).join(',')}`, p.id, patch)
+  },
+
+  saveChoice: (stage, choice) => get().patchSettings({ [stage]: choice }),
+
+  runStage: async (stage, body = {}) => {
+    const p = get().project
+    if (!p) return
+    try {
+      await api.run(p.id, stage, body)
+    } catch (e: any) {
+      get().toast(e.message, 'error')
+    }
+  },
+
+  cancelStage: async (stage) => {
+    const p = get().project
+    if (!p) return
+    try {
+      await api.cancel(p.id, stage)
+      get().toast('Cancelling…')
+    } catch (e: any) {
+      get().toast(e.message, 'error')
+    }
+  },
+
+  updateSegment: async (sid, patch) => {
+    const p = get().project
+    if (!p) return
+    set({ project: { ...p, segments: p.segments.map((s) => (s.id === sid ? { ...s, ...patch } : s)) } })
+    try {
+      await api.patchSegment(p.id, sid, patch)
+    } catch (e: any) {
+      get().toast(e.message, 'error')
+      get().openProject(p.id)
+    }
+  },
+}))
+
+function deepMerge(base: Record<string, any>, patch: Record<string, any>): any {
+  const out: Record<string, any> = { ...base }
+  for (const [k, v] of Object.entries(patch)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && k !== 'params' && typeof out[k] === 'object') out[k] = deepMerge(out[k], v)
+    else out[k] = v
+  }
+  return out
+}
+
+function refreshListSoon() {
+  if (listTimer) return
+  listTimer = setTimeout(() => {
+    listTimer = null
+    if (!useStudio.getState().project) useStudio.getState().loadProjects()
+  }, 800)
+}
+
+function handleEvent(e: any) {
+  const state = useStudio.getState()
+  const current = state.project
+  switch (e.type) {
+    case 'hello':
+    case 'jobs':
+      useStudio.setState({ jobs: e.jobs })
+      break
+    case 'project':
+      if (current && e.project.id === current.id) useStudio.setState({ project: e.project })
+      refreshListSoon()
+      break
+    case 'project_deleted':
+      useStudio.setState((s) => ({ projects: s.projects.filter((p) => p.id !== e.project_id) }))
+      break
+    case 'stage':
+      if (current && e.project_id === current.id) {
+        useStudio.setState({ project: { ...current, stages: { ...current.stages, [e.stage]: e.state } } })
+      }
+      if (e.state.status === 'done' || e.state.status === 'error') refreshListSoon()
+      break
+    case 'segment':
+      if (current && e.project_id === current.id) {
+        const segments = current.segments.slice()
+        const idx = segments[e.index]?.id === e.segment.id ? e.index : segments.findIndex((s) => s.id === e.segment.id)
+        if (idx >= 0) {
+          segments[idx] = e.segment
+          useStudio.setState({ project: { ...current, segments } })
+        }
+      }
+      break
+    case 'segments':
+      if (e.partial) {
+        useStudio.setState({ asrPreview: { projectId: e.project_id, segments: e.segments } })
+      } else if (e.final) {
+        useStudio.setState({ asrPreview: null })
+        if (current && e.project_id === current.id) useStudio.setState({ project: { ...current, segments: e.segments } })
+      }
+      break
+    case 'log':
+      useStudio.setState((s) => ({ logs: s.logs.length > 1500 ? [...s.logs.slice(-1000), e] : [...s.logs, e] }))
+      break
+    case 'engines':
+      state.loadEngines(false)
+      break
+    case 'export':
+      state.toast(`Exported ${e.items.length} files`, 'success')
+      break
+  }
+}

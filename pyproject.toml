@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dubby"
+version = "0.1.0"
+description = "Dubby 🐨 — a YouTube dubbing studio: English → Egyptian Arabic / MSA with pluggable ASR, translation and TTS engines."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Mohammed Aly" }]
+keywords = ["dubbing", "youtube", "asr", "tts", "translation", "arabic", "egyptian-arabic", "omnivoice"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Light runtime: the studio server, the worker protocol and media tooling.
+# Heavy model stacks live in the optional extras below so that every engine
+# family can be installed into the interpreter that suits it.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.6",
+    "rich>=13.7",
+    "numpy>=1.26",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+    "yt-dlp[default]>=2025.10.22",
+    "huggingface_hub>=0.30",
+]
+
+[project.optional-dependencies]
+# Core engine family: WhisperX, Cohere Transcribe / CohereX, Metro-ASR,
+# oddadmix translators, Lahgtna-OmniVoice and VoiceTut (transformers 5.x).
+core = [
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "transformers>=5.4.0",
+    "accelerate",
+    "sentencepiece",
+    "protobuf",
+    "omnivoice>=0.2.1",
+    "voicetut-tts>=0.1.1",
+    "whisperx>=3.4",
+    "coherex>=0.2.0",
+    "metro-asr>=0.3.1",
+    "silero-vad>=5.1",
+]
+# Qwen engine family: Qwen3-ASR and QwenCleo-ASR (qwen-asr pins transformers 4.57).
+# Install qwencleo-asr itself with `--no-deps` (see README).
+qwen = [
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "qwen-asr>=0.0.6",
+    "whisperx>=3.4",
+    "silero-vad>=5.1",
+]
+# NVIDIA NeMo family: Parakeet TDT.
+nemo = ["nemo_toolkit[asr]", "silero-vad>=5.1"]
+# Optional vocal / background separation for a cleaner mix.
+separation = ["demucs>=4.0.1"]
+
+[project.scripts]
+dubby = "dubby.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/MohammedAly22/dubby"
+
+[tool.setuptools.packages.find]
+include = ["dubby*"]
+
+[tool.setuptools.package-data]
+dubby = ["web/dist/**/*", "assets/*"]

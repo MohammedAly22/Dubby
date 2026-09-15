@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+.venv/
+.env
+.*.cpu.yml
+ui/node_modules/
+ui/.vite/
+.DS_Store
+Thumbs.db
+# The built UI (dubby/web/dist) is committed on purpose so the studio runs without Node.

@@ -1,0 +1,268 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+  --font-arabic: "IBM Plex Sans Arabic", "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
+
+  --color-ink: #000000;
+  --color-panel: #0b0b0b;
+  --color-raised: #121212;
+  --color-line: #1f1f1f;
+  --color-line-strong: #2e2e2e;
+  --color-muted: #8a8a8a;
+  --color-subtle: #5c5c5c;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: #000;
+  color: #fff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #fff;
+  color: #000;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 8px;
+}
+
+/* ------------------------------------------------------------------ cursors */
+/* Tailwind v4 resets buttons to the default cursor — restore the pointer everywhere it belongs. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+[role='option']:not([aria-disabled='true']),
+[role='tab'],
+a[href],
+select:not(:disabled),
+summary,
+label:has(> input[type='checkbox']),
+input[type='range']:not(:disabled),
+input[type='file'],
+input[type='color'] {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------------ text */
+.arabic {
+  font-family: var(--font-arabic);
+  direction: rtl;
+  unicode-bidi: plaintext;
+  line-height: 1.9;
+}
+
+.grain {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.hatch {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0 2px, transparent 2px 6px);
+}
+
+.row-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* ------------------------------------------------------------------ motion */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.04) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fade-in-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.stagger > * {
+  animation: fade-in-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.965); }
+  to { opacity: 1; transform: none; }
+}
+.scale-in {
+  animation: scale-in 0.28s cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to { opacity: 1; }
+}
+.backdrop-in {
+  animation: backdrop-in 0.25s ease both;
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dropdown-up {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.dropdown-in {
+  transform-origin: top center;
+  animation: dropdown-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.dropdown-up {
+  transform-origin: bottom center;
+  animation: dropdown-up 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+
+@keyframes option-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.option-in {
+  animation: option-in 0.22s ease-out both;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(28px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.toast-in {
+  animation: toast-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+.slide-up {
+  animation: slide-up 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(-7deg); }
+}
+.float {
+  animation: float 3.2s ease-in-out infinite;
+}
+
+@keyframes orb {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-70px, 40px) scale(1.15); }
+  66% { transform: translate(40px, 70px) scale(0.92); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+.orb {
+  animation: orb 18s ease-in-out infinite;
+}
+
+@keyframes word-in {
+  from { opacity: 0; transform: translateY(35%); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+.word-in {
+  animation: word-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.eq > span {
+  transform-origin: bottom;
+  animation: eq 0.85s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.45); }
+  100% { box-shadow: 0 0 0 9px rgba(255, 255, 255, 0); }
+}
+.pulse-ring {
+  animation: pulse-ring 1.7s ease-out infinite;
+}
+
+@keyframes stripes {
+  from { background-position: 0 0; }
+  to { background-position: 28px 0; }
+}
+.stripes {
+  background-image: repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 14px);
+  background-size: 28px 28px;
+  animation: stripes 0.9s linear infinite;
+}
+
+.lift {
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s ease, box-shadow 0.28s ease, background-color 0.2s ease;
+}
+.lift:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 44px -22px rgba(255, 255, 255, 0.22);
+}
+
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(0, 0, 0, 0.14) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.7s ease;
+}
+.btn-shine:hover::after {
+  transform: translateX(120%);
+}
+
+input[type='range'] {
+  accent-color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

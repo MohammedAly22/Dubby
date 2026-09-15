@@ -1,0 +1,18 @@
+# Dubby 🐨 — "qwen" engine family: Qwen3-ASR and QwenCleo-ASR
+# qwen-asr pins transformers 4.57, so it lives in its own interpreter.
+# Dubby auto-detects an env named `dubby-qwen` next to the main `dubby` env.
+#
+#   conda env create -f environment-qwen.yml
+#   conda run -n dubby-qwen pip install qwencleo-asr --no-deps
+name: dubby-qwen
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - ffmpeg
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.8.0
+      - torchaudio==2.8.0
+      - -e .[qwen]

@@ -1,0 +1,21 @@
+# Dubby 🐨 — main environment (core engine family + studio + Node.js for the UI and yt-dlp)
+#
+#   conda env create -f environment.yml
+#   conda activate dubby
+#   dubby build-ui && dubby serve
+#
+# CPU-only machine? Replace the cu128 index below with https://download.pytorch.org/whl/cpu
+name: dubby
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - nodejs>=22
+  - ffmpeg
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.8.0
+      - torchaudio==2.8.0
+      - torchvision==0.23.0
+      - -e .[core]

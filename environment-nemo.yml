@@ -1,0 +1,16 @@
+# Dubby 🐨 — "nemo" engine family: NVIDIA Parakeet TDT
+# Dubby auto-detects an env named `dubby-nemo` next to the main `dubby` env.
+#
+#   conda env create -f environment-nemo.yml
+name: dubby-nemo
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - ffmpeg
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.8.0
+      - torchaudio==2.8.0
+      - -e .[nemo]

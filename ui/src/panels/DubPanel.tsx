@@ -1,0 +1,204 @@
+import { memo, useMemo, useState } from 'react'
+import { AlertTriangle, ArrowRight, AudioLines, Headphones, Pause, Play, RefreshCw, Volume2 } from 'lucide-react'
+import { fileUrl } from '../api'
+import { EnginePicker } from '../components/EnginePicker'
+import { StageHeader } from '../components/StageHeader'
+import { AutoTextarea, Button, Empty, Equalizer, IconButton, Progress, StatusIcon } from '../components/ui'
+import { playPreview, stopPreview, usePlayer } from '../player'
+import { useStudio } from '../store'
+import type { Project, Segment } from '../types'
+import { cls, fmtTime, isBusy, isStale } from '../utils'
+import { DiacriticsBar } from './DiacriticsBar'
+
+export function DubPanel({ project, onNext, onVoice }: { project: Project; onNext: () => void; onVoice: () => void }) {
+  const st = project.stages.tts
+  const busy = isBusy(st)
+  const runStage = useStudio((s) => s.runStage)
+  const cancelStage = useStudio((s) => s.cancelStage)
+  const saveChoice = useStudio((s) => s.saveChoice)
+  const setMode = usePlayer((s) => s.setMode)
+
+  const translated = project.segments.filter((s) => s.translation.trim())
+  const voiced = translated.filter((s) => s.tts.status === 'done')
+  const todo = translated.filter((s) => s.tts.status !== 'done' || isStale(s)).map((s) => s.id)
+  const stats = useMemo(() => {
+    const ratios = voiced.map((s) => (s.tts.duration ?? 0) / Math.max(0.01, s.end - s.start))
+    return {
+      avg: ratios.length ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0,
+      over: ratios.filter((r) => r > 1.05).length,
+    }
+  }, [voiced])
+  const voiceReady = project.stages.voice?.status === 'done'
+
+  if (!translated.length) {
+    return <Empty icon={<AudioLines className="size-8" />} title="Nothing to voice yet">Translate the transcript first.</Empty>
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <StageHeader
+        icon="🔊"
+        title="Dubbed voices"
+        subtitle="Clips are generated asynchronously — listen as they land, tweak the Arabic (add tashkeel!) and regenerate any line."
+        state={st}
+        actions={
+          busy ? (
+            <Button onClick={() => cancelStage('tts')}>Cancel</Button>
+          ) : (
+            <>
+              {voiced.length > 0 && todo.length > 0 && <Button onClick={() => runStage('tts', { segment_ids: todo })}>Generate {todo.length} pending</Button>}
+              <Button variant={voiced.length ? 'secondary' : 'primary'} icon={<Volume2 className="size-4" />} disabled={!voiceReady} onClick={() => {
+                if (voiced.length && !confirm('Regenerate every clip?')) return
+                runStage('tts')
+              }}>
+                {voiced.length ? 'Regenerate all' : 'Generate all'}
+              </Button>
+              {voiced.length > 0 && (
+                <Button variant="primary" icon={<ArrowRight className="size-4" />} onClick={onNext}>
+                  Export
+                </Button>
+              )}
+            </>
+          )
+        }
+      />
+
+      {!voiceReady && (
+        <button onClick={onVoice} className="flex items-center gap-2 rounded-2xl border border-white/60 p-3 text-left text-sm">
+          <AlertTriangle className="size-4" /> Choose a reference voice before generating →
+        </button>
+      )}
+
+      <EnginePicker kind="tts" choice={project.settings.tts} target={project.settings.target} disabled={busy} onChange={(c) => saveChoice('tts', c)} />
+
+      <div className="grid grid-cols-3 gap-2">
+        <Stat label="Voiced" value={`${voiced.length}/${translated.length}`} />
+        <Stat label="Avg fit" value={voiced.length ? `${Math.round(stats.avg * 100)}%` : '—'} />
+        <Stat label="Over slot" value={String(stats.over)} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <Progress value={voiced.length / translated.length} />
+          <Button size="sm" icon={<Headphones className="size-3.5" />} disabled={!voiced.length} onClick={() => setMode('dub')}>
+            Preview on video
+          </Button>
+        </div>
+        <DiacriticsBar />
+        {translated.map((s) => (
+          <DubRow key={s.id} seg={s} index={project.segments.indexOf(s)} projectId={project.id} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-line p-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{label}</div>
+      <div className="mt-0.5 font-mono text-lg">{value}</div>
+    </div>
+  )
+}
+
+const DubRow = memo(function DubRow({ seg, index, projectId }: { seg: Segment; index: number; projectId: string }) {
+  const updateSegment = useStudio((s) => s.updateSegment)
+  const runStage = useStudio((s) => s.runStage)
+  const select = useStudio((s) => s.select)
+  const selected = useStudio((s) => s.selectedId === seg.id)
+  const active = usePlayer((s) => s.time >= seg.start && s.time < seg.end)
+  const playRange = usePlayer((s) => s.playRange)
+  const seek = usePlayer((s) => s.seek)
+  const setMode = usePlayer((s) => s.setMode)
+  const [playing, setPlaying] = useState(false)
+
+  const slot = Math.max(0.01, seg.end - seg.start)
+  const dur = seg.tts.duration ?? 0
+  const ratio = dur / slot
+  const stale = isStale(seg)
+  const working = seg.tts.status === 'queued' || seg.tts.status === 'running'
+  const url = seg.tts.audio ? fileUrl(projectId, seg.tts.audio, seg.tts.version) : null
+
+  return (
+    <div onClick={() => select(seg.id)} className={cls('row-auto group flex flex-col gap-2 rounded-2xl border p-3 transition', active ? 'border-white/70' : selected ? 'border-neutral-500' : 'border-line hover:border-line-strong')}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-500">
+          <StatusIcon status={seg.tts.status === 'pending' ? 'idle' : seg.tts.status} className="size-3.5" />
+          <span className="text-neutral-600">#{index + 1}</span>
+          {fmtTime(seg.start)}
+          {stale && <span className="rounded-full border border-white/60 px-1.5 text-[10px] text-white">text changed</span>}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <IconButton title="Play original" onClick={() => playRange(seg.start, seg.end)}>
+            <Play className="size-3.5" />
+          </IconButton>
+          <IconButton
+            title="Play dub in context"
+            disabled={!url}
+            onClick={() => {
+              setMode('dub')
+              seek(Math.max(0, seg.start - 0.3), true)
+              usePlayer.setState({ stopAt: seg.start + Math.max(dur, slot) + 0.3 })
+            }}
+          >
+            <Headphones className="size-3.5" />
+          </IconButton>
+          <IconButton
+            title={working ? 'Generating…' : 'Regenerate this clip'}
+            disabled={working || !seg.translation.trim()}
+            onClick={() => runStage('tts', { segment_ids: [seg.id] })}
+            className={cls(stale && 'bg-white text-black hover:bg-white hover:text-black')}
+          >
+            <RefreshCw className={cls('size-3.5', working && 'animate-spin')} />
+          </IconButton>
+        </div>
+      </div>
+
+      <AutoTextarea rtl value={seg.translation} onCommit={(translation) => updateSegment(seg.id, { translation })} />
+
+      <div className="flex items-center gap-3 px-1">
+        <button
+          disabled={!url}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!url) return
+            if (playing) {
+              stopPreview()
+              setPlaying(false)
+            } else {
+              playPreview(url, () => setPlaying(false))
+              setPlaying(true)
+            }
+          }}
+          className={cls(
+            'flex size-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 disabled:opacity-25',
+            url ? 'bg-white text-black hover:scale-110 hover:shadow-[0_0_18px_rgba(255,255,255,.45)]' : 'border border-line',
+            playing && 'pulse-ring',
+          )}
+          title="Listen to the dubbed clip"
+        >
+          {playing ? <Equalizer /> : <Play className="ml-0.5 size-3.5" />}
+        </button>
+        <div className="flex flex-1 flex-col gap-1">
+          <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
+            {working ? (
+              <div className="shimmer absolute inset-0" />
+            ) : dur > 0 ? (
+              <>
+                <div className="absolute inset-y-0 left-0 bg-white" style={{ width: `${Math.min(1, ratio) * 100}%` }} />
+                {ratio > 1 && <div className="hatch absolute inset-y-0 right-0" style={{ width: `${Math.min(0.5, (ratio - 1) / ratio) * 100}%` }} />}
+              </>
+            ) : null}
+          </div>
+          <div className="flex justify-between font-mono text-[10px] text-neutral-500">
+            <span>{dur ? `${dur.toFixed(2)}s dub` : seg.tts.status === 'error' ? `error: ${seg.tts.error}` : 'not generated'}</span>
+            <span className={cls(ratio > 1.35 ? 'text-white' : '')}>
+              slot {slot.toFixed(2)}s{dur ? ` · ${Math.round(ratio * 100)}%` : ''}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
