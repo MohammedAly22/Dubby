@@ -54,7 +54,7 @@ export function EnginePicker({
               onClick={() => onChange({ engine: e.id, params: e.id === choice.engine ? choice.params : {} })}
               className={cls(
                 'lift group flex flex-col gap-1.5 rounded-2xl border p-3 text-left',
-                active ? 'border-white bg-white/[.06] shadow-[0_0_0_1px_rgba(255,255,255,.4),0_0_30px_-8px_rgba(255,255,255,.25)]' : 'border-line hover:border-neutral-600',
+                active ? 'border-white bg-white/[.06]' : 'border-line bg-black/30 hover:border-neutral-600',
                 !compatible && 'opacity-35',
               )}
               title={!compatible ? 'Not compatible with the selected languages' : e.description}

@@ -6,8 +6,19 @@
     <meta name="theme-color" content="#000000" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐨</text></svg>" />
     <title>Dubby 🐨 — Dubbing Studio</title>
-    <script type="module" crossorigin src="./assets/index-DnhYFZBM.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D-qPdYM-.css">
+    <script>
+      // Apply the saved theme before first paint (no flash of the wrong theme).
+      try {
+        var q = new URLSearchParams(location.search).get('theme')
+        var t = q === 'light' || q === 'dark' ? q : localStorage.getItem('dubby-theme')
+        if (t === 'light') {
+          document.documentElement.classList.remove('dark')
+          document.documentElement.classList.add('light')
+        }
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="./assets/index-BUap-H1P.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BWO3PveO.css">
   </head>
   <body>
     <div id="root"></div>

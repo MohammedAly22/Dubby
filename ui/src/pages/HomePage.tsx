@@ -72,7 +72,7 @@ export function HomePage() {
 
   return (
     <div className="mx-auto flex max-w-[1200px] flex-col gap-14 px-4 pt-14 pb-24 sm:px-6">
-      <section className="fade-in grain relative overflow-hidden rounded-[28px] border border-line px-6 py-14 sm:px-12">
+      <section className="fade-in grain relative overflow-hidden rounded-[28px] border border-line bg-panel/60 px-6 py-14 backdrop-blur-sm sm:px-12">
         <div className="orb pointer-events-none absolute -top-40 -right-40 size-[480px] rounded-full bg-white/[.07] blur-3xl" />
         <div className="orb pointer-events-none absolute -bottom-52 left-10 size-[380px] rounded-full bg-white/[.04] blur-3xl" style={{ animationDelay: '-7s' }} />
         <div className="relative flex max-w-3xl flex-col gap-6">
@@ -105,7 +105,7 @@ export function HomePage() {
               if (url.trim()) create()
             }}
           >
-            <div className="flex flex-col gap-2 rounded-[22px] border border-line-strong bg-black p-2 transition-all duration-300 focus-within:border-white focus-within:shadow-[0_0_0_6px_rgba(255,255,255,.06)] sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-2 rounded-[22px] border border-line-strong bg-black p-2 transition-all duration-300 focus-within:border-leaf focus-within:shadow-[0_0_0_5px_rgba(155,210,60,.14)] sm:flex-row sm:items-center">
               <div className="flex flex-1 items-center gap-3 px-3">
                 <Youtube className="size-5 shrink-0 text-neutral-500" />
                 <input
@@ -165,7 +165,7 @@ function ProjectCard({ p, index, onDeleted }: { p: ProjectSummary; index: number
     <a
       href={`#/p/${p.id}`}
       style={{ ['--i' as string]: Math.min(index, 12) }}
-      className="lift group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel hover:border-neutral-600"
+      className="lift group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel backdrop-blur-xl hover:border-neutral-600"
     >
       <div className="relative aspect-video overflow-hidden bg-neutral-950">
         {p.source.thumbnail ? (

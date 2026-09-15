@@ -106,7 +106,7 @@ export function VideoPlayer({ project }: { project: Project }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="group relative overflow-hidden rounded-2xl border border-line bg-black">
+      <div className="group relative overflow-hidden rounded-2xl border border-line bg-[#000]">
         {src ? (
           <video
             key={src}
@@ -115,7 +115,7 @@ export function VideoPlayer({ project }: { project: Project }) {
             controls
             playsInline
             preload="metadata"
-            className="aspect-video w-full bg-black"
+            className="aspect-video w-full bg-[#000]"
             onLoadedMetadata={(e) => {
               if (resumeAt.current) e.currentTarget.currentTime = resumeAt.current
               usePlayer.setState({ duration: e.currentTarget.duration })
@@ -133,10 +133,10 @@ export function VideoPlayer({ project }: { project: Project }) {
         {captions && seg && effectiveMode !== 'render' && (
           <div className="pointer-events-none absolute inset-x-0 bottom-14 flex flex-col items-center gap-1 px-6">
             {effectiveMode === 'original' && (
-              <div className="max-w-[92%] rounded-lg bg-black/75 px-3 py-1.5 text-center text-sm leading-relaxed backdrop-blur" dir="auto">
+              <div className="max-w-[92%] rounded-lg bg-[#000]/75 px-3 py-1.5 text-center text-sm leading-relaxed text-[#fff] backdrop-blur" dir="auto">
                 {seg.words.length
                   ? seg.words.map((w, i) => (
-                      <span key={i} className={cls('transition-colors', time >= w.start && time < w.end ? 'text-white' : time >= w.end ? 'text-neutral-300' : 'text-neutral-500')}>
+                      <span key={i} className={cls('transition-colors', time >= w.start && time < w.end ? 'font-semibold text-[#c8ec6f]' : time >= w.end ? 'text-[#e5e5e5]' : 'text-[#8a8a8a]')}>
                         {w.text}{' '}
                       </span>
                     ))
@@ -144,7 +144,7 @@ export function VideoPlayer({ project }: { project: Project }) {
               </div>
             )}
             {seg.translation && (
-              <div className="arabic max-w-[92%] rounded-lg bg-white px-3 py-1 text-center text-[15px] font-medium text-black">{seg.translation}</div>
+              <div className="arabic bg-accent-gradient max-w-[92%] rounded-lg px-3 py-1 text-center text-[15px] font-semibold text-on-accent shadow-[0_6px_20px_-6px_rgba(155,210,60,.7)]">{seg.translation}</div>
             )}
           </div>
         )}

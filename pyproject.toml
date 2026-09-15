@@ -68,7 +68,7 @@ separation = ["demucs>=4.0.1"]
 dubby = "dubby.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/MohammedAly22/dubby"
+Homepage = "https://github.com/MohammedAly22/Dubby"
 
 [tool.setuptools.packages.find]
 include = ["dubby*"]

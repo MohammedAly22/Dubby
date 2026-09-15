@@ -1,18 +1,75 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+/*
+ * Theme tokens. Dark is the default. In light mode (html.light) the black / white / neutral
+ * scales swap, so every existing utility (bg-black, text-white, text-neutral-400, …) flips
+ * without per-component changes. Brand accents come from the Dubby banner: lime + sun yellow.
+ */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
   --font-arabic: "IBM Plex Sans Arabic", "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
 
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #787878;
+  --color-neutral-600: #555555;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral-950: #0a0a0a;
+
   --color-ink: #000000;
-  --color-panel: #0b0b0b;
-  --color-raised: #121212;
-  --color-line: #1f1f1f;
-  --color-line-strong: #2e2e2e;
+  --color-panel: rgba(11, 12, 10, 0.82);
+  --color-raised: #131511;
+  --color-line: #20231c;
+  --color-line-strong: #30342a;
   --color-muted: #8a8a8a;
   --color-subtle: #5c5c5c;
+
+  /* brand */
+  --color-leaf: #9bd23c;
+  --color-leaf-soft: #b7e36a;
+  --color-leaf-deep: #6fa82a;
+  --color-sun: #f4e03a;
+  --color-on-accent: #0f1a05;
+  --color-accent-ink: #b7e36a;
+}
+
+html.light {
+  color-scheme: light;
+  --color-white: #0c1206;
+  --color-black: #f6f8f1;
+  --color-neutral-50: #0a0a0a;
+  --color-neutral-100: #171717;
+  --color-neutral-200: #262626;
+  --color-neutral-300: #3a3d36;
+  --color-neutral-400: #4d5147;
+  --color-neutral-500: #6a6e63;
+  --color-neutral-600: #8d9186;
+  --color-neutral-700: #b3b7ab;
+  --color-neutral-800: #d9ddd0;
+  --color-neutral-900: #e9ece2;
+  --color-neutral-950: #f1f4ea;
+
+  --color-panel: rgba(255, 255, 255, 0.78);
+  --color-raised: #eef2e6;
+  --color-line: #e0e5d6;
+  --color-line-strong: #cdd4c0;
+  --color-accent-ink: #4d8a12;
+  --blob-opacity: 0.05;
+}
+
+:root {
+  color-scheme: dark;
+  --blob-opacity: 0.06;
+  --accent-gradient: linear-gradient(100deg, var(--color-leaf) 0%, #c3e657 58%, var(--color-sun) 100%);
 }
 
 html,
@@ -22,20 +79,21 @@ body,
 }
 
 body {
-  background: #000;
-  color: #fff;
+  background: var(--color-black);
+  color: var(--color-white);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 ::selection {
-  background: #fff;
-  color: #000;
+  background: var(--color-white);
+  color: var(--color-black);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2a2a transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -44,16 +102,21 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: var(--color-line-strong);
   border-radius: 8px;
 }
 
-/* ------------------------------------------------------------------ cursors */
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-600);
+}
+
+/* ------------------------------------------------------------------ cursors & focus */
 /* Tailwind v4 resets buttons to the default cursor — restore the pointer everywhere it belongs. */
 button:not(:disabled),
 [role='button']:not([aria-disabled='true']),
 [role='option']:not([aria-disabled='true']),
 [role='tab'],
+[role='switch'],
 a[href],
 select:not(:disabled),
 summary,
@@ -71,6 +134,38 @@ input:disabled,
   cursor: not-allowed;
 }
 
+:where(button, a[href], [role='tab'], [role='switch'], [role='option'], summary):focus-visible {
+  outline: 2px solid var(--color-leaf);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-leaf) 22%, transparent);
+}
+
+input[type='range'] {
+  accent-color: var(--color-white);
+}
+
+/* ------------------------------------------------------------------ brand helpers */
+.bg-accent-gradient {
+  background-image: var(--accent-gradient);
+  background-size: 160% 100%;
+  background-position: 0% 50%;
+  transition: background-position 0.6s ease, box-shadow 0.3s ease, filter 0.3s ease;
+}
+.bg-accent-gradient:hover {
+  background-position: 100% 50%;
+}
+
+.text-accent-gradient {
+  background-image: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glow-leaf {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-leaf) 45%, transparent), 0 10px 36px -10px color-mix(in srgb, var(--color-leaf) 70%, transparent);
+}
+
 /* ------------------------------------------------------------------ text */
 .arabic {
   font-family: var(--font-arabic);
@@ -80,17 +175,91 @@ input:disabled,
 }
 
 .grain {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-image: radial-gradient(color-mix(in srgb, var(--color-white) 7%, transparent) 1px, transparent 1px);
   background-size: 18px 18px;
 }
 
 .hatch {
-  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0 2px, transparent 2px 6px);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-white) 35%, transparent) 0 2px, transparent 2px 6px);
 }
 
 .row-auto {
   content-visibility: auto;
   contain-intrinsic-size: auto 120px;
+}
+
+/* ------------------------------------------------------------------ animated background */
+.app-bg-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--color-white) 8%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 78%);
+  animation: grid-pan 40s linear infinite;
+}
+@keyframes grid-pan {
+  from { background-position: 0 0; }
+  to { background-position: 240px 120px; }
+}
+
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: var(--blob-opacity);
+  will-change: transform;
+  transition: opacity 0.6s ease;
+}
+.blob-1 {
+  width: 46vw;
+  height: 46vw;
+  left: -12vw;
+  top: -16vw;
+  background: var(--color-white);
+  animation: blob-a 26s ease-in-out infinite;
+}
+.blob-2 {
+  width: 34vw;
+  height: 34vw;
+  right: -10vw;
+  top: 18vh;
+  background: var(--color-neutral-400);
+  animation: blob-b 32s ease-in-out infinite;
+}
+.blob-3 {
+  width: 38vw;
+  height: 38vw;
+  left: 28vw;
+  bottom: -22vw;
+  background: var(--color-neutral-600);
+  animation: blob-c 38s ease-in-out infinite;
+}
+@keyframes blob-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(14vw, 10vh) scale(1.18); }
+}
+@keyframes blob-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-12vw, 16vh) scale(0.85); }
+}
+@keyframes blob-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-10vw, -12vh) scale(1.12); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -22px, 0) rotate(14deg); }
+}
+.drift {
+  animation: drift 12s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 0.9; transform: scale(1.1); }
+}
+.twinkle {
+  animation: twinkle 4.5s ease-in-out infinite;
 }
 
 /* ------------------------------------------------------------------ motion */
@@ -99,7 +268,12 @@ input:disabled,
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.04) 100%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-white) 4%, transparent) 0%,
+    color-mix(in srgb, var(--color-white) 14%, transparent) 50%,
+    color-mix(in srgb, var(--color-white) 4%, transparent) 100%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
@@ -126,7 +300,7 @@ input:disabled,
 }
 
 @keyframes backdrop-in {
-  from { opacity: 0; backdrop-filter: blur(0); }
+  from { opacity: 0; }
   to { opacity: 1; }
 }
 .backdrop-in {
@@ -210,8 +384,8 @@ input:disabled,
 }
 
 @keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.45); }
-  100% { box-shadow: 0 0 0 9px rgba(255, 255, 255, 0); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-white) 45%, transparent); }
+  100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-white) 0%, transparent); }
 }
 .pulse-ring {
   animation: pulse-ring 1.7s ease-out infinite;
@@ -222,8 +396,8 @@ input:disabled,
   to { background-position: 28px 0; }
 }
 .stripes {
-  background-image: repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 14px);
-  background-size: 28px 28px;
+  background-image: repeating-linear-gradient(-45deg, rgba(15, 26, 5, 0.18) 0 7px, transparent 7px 14px), var(--accent-gradient);
+  background-size: 28px 28px, 100% 100%;
   animation: stripes 0.9s linear infinite;
 }
 
@@ -232,7 +406,7 @@ input:disabled,
 }
 .lift:hover:not(:disabled) {
   transform: translateY(-3px);
-  box-shadow: 0 20px 44px -22px rgba(255, 255, 255, 0.22);
+  box-shadow: 0 20px 44px -22px color-mix(in srgb, var(--color-white) 22%, transparent);
 }
 
 .btn-shine {
@@ -245,7 +419,7 @@ input:disabled,
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(110deg, transparent 30%, rgba(0, 0, 0, 0.14) 50%, transparent 70%);
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--color-black) 14%, transparent) 50%, transparent 70%);
   transform: translateX(-120%);
   transition: transform 0.7s ease;
 }
@@ -253,8 +427,18 @@ input:disabled,
   transform: translateX(120%);
 }
 
-input[type='range'] {
-  accent-color: #fff;
+/* ------------------------------------------------------------------ theme switch reveal */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: theme-reveal 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes theme-reveal {
+  from { clip-path: circle(0px at var(--tx, 90%) var(--ty, 28px)); }
+  to { clip-path: circle(var(--tr, 150vmax) at var(--tx, 90%) var(--ty, 28px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

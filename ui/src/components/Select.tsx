@@ -164,8 +164,8 @@ export function Select<T extends string>({
         onClick={() => (open ? close() : openMenu())}
         onKeyDown={onKey}
         className={cls(
-          'group inline-flex w-full items-center justify-between gap-2 border bg-black text-left text-white outline-none transition-all duration-200 hover:border-neutral-500 focus-visible:border-white active:scale-[.99] disabled:opacity-40',
-          open ? 'border-white shadow-[0_0_0_4px_rgba(255,255,255,.08)]' : 'border-line-strong',
+          'group inline-flex w-full items-center justify-between gap-2 border bg-black text-left text-white outline-none transition-all duration-200 hover:border-neutral-500 focus-visible:border-leaf active:scale-[.99] disabled:opacity-40',
+          open ? 'border-leaf shadow-[0_0_0_4px_rgba(155,210,60,.18)]' : 'border-line-strong',
           sizes[size],
           className,
         )}
@@ -213,7 +213,7 @@ export function Select<T extends string>({
                     <span className="block truncate">{o.label}</span>
                     {o.description && <span className="block truncate text-xs text-neutral-500">{o.description}</span>}
                   </span>
-                  <Check className={cls('size-4 shrink-0 transition-all duration-200', isSelected ? 'scale-100 opacity-100' : 'scale-50 opacity-0')} />
+                  <Check className={cls('size-4 shrink-0 text-white transition-all duration-200', isSelected ? 'scale-100 opacity-100' : 'scale-50 opacity-0')} />
                 </div>
               )
             })}

@@ -90,11 +90,11 @@ export function ProjectPage({ id }: { id: string }) {
           </div>
         </div>
 
-        <nav ref={container} className="relative flex overflow-x-auto rounded-full border border-line-strong bg-panel p-1">
+        <nav ref={container} className="relative flex overflow-x-auto rounded-full border border-line-strong bg-panel p-1 backdrop-blur-xl">
           <span
             aria-hidden
             className={cls(
-              'pointer-events-none absolute top-1 bottom-1 rounded-full bg-white shadow-[0_0_24px_rgba(255,255,255,.3)]',
+              'pointer-events-none absolute top-1 bottom-1 rounded-full bg-white',
               ready && 'transition-[left,width,opacity] duration-[400ms] ease-[cubic-bezier(.3,1.25,.5,1)]',
             )}
             style={style}
@@ -126,7 +126,7 @@ export function ProjectPage({ id }: { id: string }) {
           <VideoPlayer project={p} />
           <Timeline project={p} />
         </div>
-        <div className="min-w-0 rounded-2xl border border-line bg-panel p-5 lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto">
+        <div className="min-w-0 rounded-2xl border border-line bg-panel p-5 backdrop-blur-xl lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto">
           <div key={active} className="fade-in">
             {active === 'source' && <SourcePanel project={p} onNext={() => setTab('asr')} />}
             {active === 'asr' && <TranscribePanel project={p} onNext={() => setTab('translation')} />}

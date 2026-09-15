@@ -17,7 +17,7 @@ export function Button({
   const base =
     'inline-flex items-center justify-center gap-2 rounded-full font-medium select-none whitespace-nowrap transition-all duration-200 ease-out active:scale-[.96] disabled:opacity-35 disabled:active:scale-100'
   const variants: Record<Variant, string> = {
-    primary: 'btn-shine bg-white text-black hover:bg-neutral-100 hover:shadow-[0_0_28px_rgba(255,255,255,.28)]',
+    primary: 'btn-shine bg-white text-black hover:bg-neutral-100 hover:shadow-[0_0_28px_color-mix(in_srgb,var(--color-white)_25%,transparent)]',
     secondary: 'bg-raised text-white border border-line-strong hover:border-neutral-500 hover:bg-neutral-900',
     ghost: 'text-neutral-300 hover:text-white hover:bg-white/5',
     danger: 'border border-neutral-700 text-neutral-200 hover:bg-white hover:text-black',
@@ -57,11 +57,15 @@ export function Badge({ children, tone = 'default', className }: { children: Rea
   return <span className={cls('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider', tones[tone], className)}>{children}</span>
 }
 
+/** Progress bars are one of the few places that carry the brand accent. */
 export function Progress({ value, active, className }: { value: number; active?: boolean; className?: string }) {
   return (
     <div className={cls('relative h-1.5 w-full overflow-hidden rounded-full bg-white/10', className)}>
       <div
-        className={cls('relative h-full rounded-full bg-white transition-[width] duration-500 ease-[cubic-bezier(.2,.8,.2,1)]', active && 'stripes shadow-[0_0_14px_rgba(255,255,255,.6)]')}
+        className={cls(
+          'relative h-full rounded-full transition-[width] duration-500 ease-[cubic-bezier(.2,.8,.2,1)]',
+          active ? 'stripes shadow-[0_0_12px_rgba(155,210,60,.6)]' : 'bg-accent-gradient',
+        )}
         style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
       />
       {active && <div className="shimmer absolute inset-0" />}
@@ -100,10 +104,7 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={cls(
-          'relative h-5 w-9 shrink-0 rounded-full border transition-all duration-300',
-          checked ? 'border-white bg-white shadow-[0_0_14px_rgba(255,255,255,.35)]' : 'border-neutral-700 bg-neutral-900 hover:border-neutral-500',
-        )}
+        className={cls('relative h-5 w-9 shrink-0 rounded-full border transition-all duration-300', checked ? 'border-white bg-white' : 'border-neutral-700 bg-neutral-900 hover:border-neutral-500')}
       >
         <span className={cls('absolute top-0.5 size-3.5 rounded-full transition-all duration-300 ease-[cubic-bezier(.3,1.5,.5,1)]', checked ? 'left-[18px] bg-black' : 'left-0.5 bg-neutral-500')} />
       </button>
@@ -177,10 +178,7 @@ export function Segmented<T extends string>({
     <div ref={container} role="tablist" className={cls('relative inline-flex rounded-full border border-line-strong bg-black p-0.5', className)}>
       <span
         aria-hidden
-        className={cls(
-          'pointer-events-none absolute top-0.5 bottom-0.5 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,.25)]',
-          ready && 'transition-[left,width,opacity] duration-300 ease-[cubic-bezier(.3,1.25,.5,1)]',
-        )}
+        className={cls('pointer-events-none absolute top-0.5 bottom-0.5 rounded-full bg-white', ready && 'transition-[left,width,opacity] duration-300 ease-[cubic-bezier(.3,1.25,.5,1)]')}
         style={style}
       />
       {options.map((o, i) => (
@@ -218,8 +216,9 @@ export function Field({ label, hint, children, className }: { label: ReactNode; 
   )
 }
 
+/** Inputs keep the accent only on focus. */
 export const inputCls =
-  'h-9 w-full rounded-xl border border-line-strong bg-black px-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-neutral-600 hover:border-neutral-600 focus:border-white focus:shadow-[0_0_0_4px_rgba(255,255,255,.07)]'
+  'h-9 w-full rounded-xl border border-line-strong bg-black px-3 text-sm text-white outline-none transition-all duration-200 placeholder:text-neutral-600 hover:border-neutral-600 focus:border-leaf focus:shadow-[0_0_0_4px_rgba(155,210,60,.15)]'
 
 export function Slider({ value, onChange, min, max, step, format }: { value: number; onChange: (v: number) => void; min: number; max: number; step: number; format?: (v: number) => string }) {
   return (
@@ -306,7 +305,7 @@ export function AutoTextarea({
         }
       }}
       className={cls(
-        'w-full cursor-text resize-none overflow-hidden rounded-xl border border-transparent bg-transparent px-2.5 py-1.5 text-sm text-white outline-none transition-all duration-200 hover:border-line-strong focus:border-white focus:bg-black focus:shadow-[0_0_0_4px_rgba(255,255,255,.06)]',
+        'w-full cursor-text resize-none overflow-hidden rounded-xl border border-transparent bg-transparent px-2.5 py-1.5 text-sm text-white outline-none transition-all duration-200 hover:border-line-strong focus:border-leaf focus:bg-black focus:shadow-[0_0_0_4px_rgba(155,210,60,.14)]',
         rtl && 'arabic text-[15px]',
         className,
       )}
@@ -332,8 +331,11 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [onClose])
   if (!open) return null
   return (
-    <div className="backdrop-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-md sm:p-10" onMouseDown={onClose}>
-      <div className={cls('scale-in w-full rounded-2xl border border-line-strong bg-panel shadow-[0_40px_120px_-20px_rgba(0,0,0,1)]', wide ? 'max-w-4xl' : 'max-w-xl')} onMouseDown={(e) => e.stopPropagation()}>
+    <div className="backdrop-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-md sm:p-10" onMouseDown={onClose}>
+      <div
+        className={cls('scale-in w-full rounded-2xl border border-line-strong bg-panel shadow-[0_40px_120px_-20px_rgba(0,0,0,.8)] backdrop-blur-xl', wide ? 'max-w-4xl' : 'max-w-xl')}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <div className="text-base font-semibold">{title}</div>
           <IconButton title="Close" onClick={onClose} className="hover:rotate-90">

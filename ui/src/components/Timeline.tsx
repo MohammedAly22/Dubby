@@ -52,7 +52,7 @@ export function Timeline({ project }: { project: Project }) {
   const showPreview = preview && preview.projectId === project.id
 
   return (
-    <div className="rounded-2xl border border-line bg-panel">
+    <div className="rounded-2xl border border-line bg-panel backdrop-blur-xl">
       <div className="flex items-center justify-between px-3 pt-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Timeline</span>
         <div className="flex items-center gap-1">
@@ -133,7 +133,7 @@ export function Timeline({ project }: { project: Project }) {
           </div>
 
           {/* playhead */}
-          <div className="pointer-events-none absolute top-0 bottom-0 w-px bg-white shadow-[0_0_8px_rgba(255,255,255,.8)]" style={{ left: time * pps }}>
+          <div className="pointer-events-none absolute top-0 bottom-0 w-px bg-white shadow-[0_0_8px_color-mix(in_srgb,var(--color-white)_60%,transparent)]" style={{ left: time * pps }}>
             <div className="absolute -top-0.5 -left-[3px] size-[7px] rotate-45 bg-white" />
           </div>
         </div>

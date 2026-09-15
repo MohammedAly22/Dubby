@@ -64,7 +64,7 @@ export function DubPanel({ project, onNext, onVoice }: { project: Project; onNex
       />
 
       {!voiceReady && (
-        <button onClick={onVoice} className="flex items-center gap-2 rounded-2xl border border-white/60 p-3 text-left text-sm">
+        <button onClick={onVoice} className="flex items-center gap-2 rounded-2xl border border-white/60 p-3 text-left text-sm transition-colors hover:bg-white/5">
           <AlertTriangle className="size-4" /> Choose a reference voice before generating →
         </button>
       )}
@@ -173,7 +173,7 @@ const DubRow = memo(function DubRow({ seg, index, projectId }: { seg: Segment; i
           }}
           className={cls(
             'flex size-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 active:scale-90 disabled:opacity-25',
-            url ? 'bg-white text-black hover:scale-110 hover:shadow-[0_0_18px_rgba(255,255,255,.45)]' : 'border border-line',
+            url ? 'bg-white text-black hover:scale-110' : 'border border-line',
             playing && 'pulse-ring',
           )}
           title="Listen to the dubbed clip"
@@ -186,7 +186,7 @@ const DubRow = memo(function DubRow({ seg, index, projectId }: { seg: Segment; i
               <div className="shimmer absolute inset-0" />
             ) : dur > 0 ? (
               <>
-                <div className="absolute inset-y-0 left-0 bg-white" style={{ width: `${Math.min(1, ratio) * 100}%` }} />
+                <div className="bg-accent-gradient absolute inset-y-0 left-0" style={{ width: `${Math.min(1, ratio) * 100}%` }} />
                 {ratio > 1 && <div className="hatch absolute inset-y-0 right-0" style={{ width: `${Math.min(0.5, (ratio - 1) / ratio) * 100}%` }} />}
               </>
             ) : null}
