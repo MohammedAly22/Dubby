@@ -115,6 +115,15 @@ def create_app(studio: Studio) -> FastAPI:
         studio.apply_settings(settings)
         return settings.public()
 
+    @app.post("/api/settings/cookies")
+    async def upload_cookies(file: UploadFile = File(...)):
+        data = await file.read()
+        return (await run_in_threadpool(studio.save_cookies, data)).public()
+
+    @app.delete("/api/settings/cookies")
+    async def delete_cookies():
+        return (await run_in_threadpool(studio.remove_cookies)).public()
+
     @app.get("/api/engines")
     async def engines(refresh: bool = False):
         return await run_in_threadpool(studio.engines, refresh)
@@ -166,6 +175,11 @@ def create_app(studio: Studio) -> FastAPI:
         data = await file.read()
         p = await run_in_threadpool(studio.create_project_from_file, file.filename or "video.mp4", data, source_language, target)
         return p.model_dump()
+
+    @app.post("/api/projects/{pid}/source/upload")
+    async def replace_source(pid: str, file: UploadFile = File(...)):
+        data = await file.read()
+        return (await run_in_threadpool(studio.replace_source_with_file, pid, file.filename or "video.mp4", data)).model_dump()
 
     @app.get("/api/projects/{pid}")
     async def get_project(pid: str):

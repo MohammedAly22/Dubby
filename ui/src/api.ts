@@ -33,6 +33,17 @@ export const api = {
   system: () => req<Record<string, any>>('/system'),
   getSettings: () => req<Record<string, any>>('/settings'),
   putSettings: (body: Record<string, unknown>) => req<Record<string, any>>('/settings', json('PUT', body)),
+  uploadCookies: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return req<Record<string, any>>('/settings/cookies', { method: 'POST', body: fd })
+  },
+  deleteCookies: () => req<Record<string, any>>('/settings/cookies', json('DELETE')),
+  replaceSource: (id: string, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return req<Project>(`/projects/${id}/source/upload`, { method: 'POST', body: fd })
+  },
   engines: (refresh = false) => req<{ engines: EngineInfo[]; families: Record<string, any> }>(`/engines${refresh ? '?refresh=true' : ''}`),
   jobs: () => req<JobsSnapshot>('/jobs'),
   stopWorkers: () => req<JobsSnapshot>('/workers/stop', json('POST')),

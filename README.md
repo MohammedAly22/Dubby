@@ -382,7 +382,7 @@ dubby dub "URL" --source en --target arz --tts voicetut --voice preset:Mohamed -
 
 Run [`notebooks/Dubby_Colab.ipynb`](notebooks/Dubby_Colab.ipynb) cell by cell:
 
-`0 helpers` → `1 GPU` → `2 clone` → `3 Node.js 22` → `4 core venv` → `5 qwen / nemo / indic venvs` → `6 HF token` → `7 build UI + doctor + languages` → `🚀 launch`
+`0 helpers` → `1 GPU` → `2 clone` → `3 Node.js 22` → `4 core venv` → `5 qwen / nemo / indic venvs` → `6 HF token` → `🍪 YouTube cookies` → `7 build UI + doctor + languages` → `🚀 launch`
 
 * Dubby installs with **`uv` into isolated Python 3.12 venvs** under `/content/envs`, so Colab's own Python 3.13 packages never conflict with it.
 * Every install step **stops with the real error**. You never see a ✅ on a failed install, and the venv's `dubby` is added to `PATH` for later cells.
@@ -402,8 +402,19 @@ Settings live in `~/Dubby/settings.json` and can be edited in the UI. Environmen
 | `DUBBY_PYTHON_CORE` · `_QWEN` · `_NEMO` · `_INDIC` | Interpreter per engine family |
 | `HF_TOKEN` | Hugging Face token passed to workers |
 
-> [!TIP]
-> YouTube asking you to *"sign in to confirm you're not a bot"*? Export a `cookies.txt` from your browser and set **YouTube cookies file** in Settings.
+### 🍪 YouTube cookies ("Sign in to confirm you're not a bot")
+
+YouTube often blocks cloud and datacenter IPs (Colab, cloud VMs) with *"Sign in to confirm you're not a bot"*. The fix, [recommended by yt-dlp](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies), is to download with cookies from your own browser session:
+
+1. Open a **private/incognito** window and sign in to YouTube.
+2. Export the **youtube.com** cookies in Netscape format (for example with the *Get cookies.txt LOCALLY* extension) as `cookies.txt`.
+3. **Close the private window** so YouTube does not rotate those cookies.
+4. Upload the file: **⚙️ Settings → YouTube cookies**, the **Upload cookies.txt** button on a failed download (it retries automatically), or the 🍪 cell in the Colab notebook.
+
+Dubby validates the file, keeps it only in `DUBBY_HOME` (never in the repository) and never logs its contents. If YouTube still refuses, use **Upload the video file instead** on the Source step: the project keeps all its settings.
+
+> [!CAUTION]
+> Cookies grant access to your YouTube account, and heavy automated downloading can get an account flagged. Consider using a secondary account.
 
 ---
 
@@ -484,7 +495,8 @@ class MyTTS(TTSEngine):
 | Dub has a foreign accent | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice |
 | Weak Hindi pronunciation | Use IndicF5 (indic family) instead of OmniVoice, which has only 117 h of Hindi |
 | Colab: `dubby: command not found` | Re-run step 4. It installs into `/content/envs/dubby` and adds it to `PATH`, and it stops with the real error if the install fails |
-| YouTube download blocked | `pip install -U "yt-dlp[default]"`, make sure `node` ≥ 22 is found, and add a cookies file |
+| *Sign in to confirm you're not a bot* | Add YouTube cookies ([see above](#-youtube-cookies-sign-in-to-confirm-youre-not-a-bot)) and retry, or upload the video file on the Source step |
+| YouTube download fails with cookies | The cookies expired or were rotated. Export fresh ones from a private window, and update yt-dlp: `pip install -U "yt-dlp[default]"` with `node` ≥ 22 on the PATH |
 | `Could not resolve host: github.com` | Your network is blocking GitHub's DNS. Use another network or ask your admin |
 | Dev UI shows *backend not reachable* | Start `dubby serve`, or run `dubby dev` to launch the backend and Vite together |
 | Clips sound rushed | Lower *Max speed-up*, shorten the line, or raise *Max chunk* |

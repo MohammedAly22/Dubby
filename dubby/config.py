@@ -112,6 +112,7 @@ class Settings(BaseModel):
         data["worker_python_resolved"] = {f: self.python_for(f) for f in ENGINE_FAMILIES}
         data["node_resolved"] = self.resolved_node()
         data["device_resolved"] = self.resolved_device()
+        data["cookies_configured"] = bool(self.cookies_file and Path(self.cookies_file).expanduser().is_file())
         return data
 
 

@@ -5,6 +5,7 @@ Both the web server and the CLI drive the pipeline exclusively through this clas
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import threading
@@ -17,7 +18,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple  # 
 from pydantic import ValidationError
 
 from dubby import languages, recommend
-from dubby.config import ENGINE_FAMILIES, Settings, load_settings
+from dubby.config import ENGINE_FAMILIES, Settings, load_settings, save_settings
 from dubby.core import voices
 from dubby.core.events import EventBus
 from dubby.core.jobs import Job, JobHandlers, JobManager, run_doctor
@@ -240,6 +241,65 @@ class Studio:
         self.pool.submit(self._prepare_source, p.id)
         return self.store.get(p.id)
 
+    def replace_source_with_file(self, project_id: str, filename: str, data: bytes) -> Project:
+        """Use an uploaded video for an existing project (e.g. when YouTube blocks the download)."""
+        p = self.store.get(project_id)
+        if p.stages.get("download", StageState()).status in ("running", "queued"):
+            raise StudioError("The download is still running — cancel it first.")
+        ext = Path(filename).suffix.lower() or ".mp4"
+        dest = self.store.dir(project_id) / "source" / f"upload{ext}"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        with self.store.mutate(project_id) as proj:
+            proj.source.kind, proj.source.video = "upload", f"source/{dest.name}"
+            proj.source.audio16k = proj.source.audio_hq = proj.source.vocals = proj.source.background = None
+            if proj.title in ("YouTube video", "Untitled"):
+                proj.title = Path(filename).stem
+        self.bus.log(f"Using uploaded file {filename} as the source", project_id=project_id)
+        self.publish_project(project_id)
+        self.pool.submit(self._prepare_source, project_id)
+        return self.store.get(project_id)
+
+    # ---------------------------------------------------------- YouTube cookies
+    def save_cookies(self, data: bytes) -> Settings:
+        """Validate and store a Netscape cookies.txt used by yt-dlp. Contents are never logged."""
+        text = data.decode("utf-8", errors="replace")
+        entries = []
+        for line in text.splitlines():
+            if line.startswith("#HttpOnly_"):
+                line = line[len("#HttpOnly_"):]
+            elif not line.strip() or line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            if len(fields) >= 7:
+                entries.append(fields)
+        if not entries:
+            raise StudioError("That is not a Netscape cookies.txt file (tab-separated lines with 7 fields). Export it with a “Get cookies.txt LOCALLY” browser extension.")
+        if not any("youtube.com" in f[0] for f in entries):
+            raise StudioError("The file has no youtube.com cookies — export them from a browser tab where you are signed in to YouTube.")
+        path = self.settings.home_path / "cookies.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        settings = save_settings({"cookies_file": str(path)})
+        self.apply_settings(settings)
+        self.bus.log(f"YouTube cookies saved ({sum(1 for f in entries if 'youtube.com' in f[0])} youtube.com cookies)", source="settings")
+        return settings
+
+    def remove_cookies(self) -> Settings:
+        current = self.settings.cookies_file
+        if current:
+            path = Path(current)
+            if path.is_file() and path.parent.resolve() == self.settings.home_path.resolve():
+                path.unlink(missing_ok=True)
+        settings = save_settings({"cookies_file": None})
+        self.apply_settings(settings)
+        self.bus.log("YouTube cookies removed", source="settings")
+        return settings
+
     def delete_project(self, project_id: str) -> None:
         self.jobs.cancel(project_id)
         self.store.delete(project_id)
@@ -292,6 +352,10 @@ class Studio:
             self.publish_project(project_id)
         except Cancelled:
             self.set_stage(project_id, stage, status="cancelled", message="Cancelled")
+        except youtube.YouTubeAccessError as exc:
+            # expected, actionable failure: no traceback, just the explanation
+            self.bus.log(str(exc), "warning", project_id, source="download")
+            self.set_stage(project_id, stage, status="error", error=str(exc), message="Needs cookies or a file upload" if exc.needs_cookies else "Failed")
         except Exception as exc:
             self.bus.log(traceback.format_exc(), "error", project_id, source="download")
             self.set_stage(project_id, stage, status="error", error=str(exc), message="Failed")

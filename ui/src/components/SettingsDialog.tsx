@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Cpu, Power, RefreshCw, Save } from 'lucide-react'
 import { api } from '../api'
 import { useStudio } from '../store'
+import { CookiesField } from './CookiesField'
 import { Select } from './Select'
 import { Button, Field, Modal, Switch, inputCls } from './ui'
 
@@ -77,8 +78,8 @@ export function SettingsDialog() {
             <Field label="Export directory" hint="Where exported videos are saved on the studio machine.">
               <input className={inputCls} placeholder={`${settings.home}/exports`} value={settings.export_dir ?? ''} onChange={(e) => set('export_dir', e.target.value)} />
             </Field>
-            <Field label="YouTube cookies file" hint="Netscape cookies.txt — helps when YouTube asks to sign in.">
-              <input className={inputCls} placeholder="/path/to/cookies.txt" value={settings.cookies_file ?? ''} onChange={(e) => set('cookies_file', e.target.value)} />
+            <Field label="YouTube cookies" className="sm:col-span-2">
+              <CookiesField configured={!!settings.cookies_configured} onChange={(s) => setSettings(s)} />
             </Field>
             <Field label="Node.js path" hint={`Resolved: ${settings.node_resolved ?? 'not found'} (used by yt-dlp)`}>
               <input className={inputCls} placeholder="auto" value={settings.node_path ?? ''} onChange={(e) => set('node_path', e.target.value)} />

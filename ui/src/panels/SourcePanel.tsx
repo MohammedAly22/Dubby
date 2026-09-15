@@ -1,5 +1,7 @@
-import { ArrowRight, Globe2, RotateCcw, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, Cookie, Globe2, RotateCcw, Sparkles, Upload } from 'lucide-react'
 import { api } from '../api'
+import { CookiesField } from '../components/CookiesField'
 import { LangLabel, SOURCE_OPTIONS, TARGET_OPTIONS } from '../components/Flags'
 import { Select } from '../components/Select'
 import { StageHeader } from '../components/StageHeader'
@@ -40,6 +42,8 @@ export function SourcePanel({ project, onNext }: { project: Project; onNext: () 
           )
         }
       />
+
+      {st?.status === 'error' && src.kind === 'youtube' && <DownloadRecovery project={project} needsCookies={/not a bot|cookies|private|members-only|age-restricted/i.test(st.error ?? '')} />}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Info label="Title" value={src.title ?? project.title} />
@@ -109,6 +113,79 @@ export function SourcePanel({ project, onNext }: { project: Project; onNext: () 
           >
             Use recommended engines
           </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Shown when a YouTube download fails: add cookies and retry, or use an uploaded file. */
+function DownloadRecovery({ project, needsCookies }: { project: Project; needsCookies: boolean }) {
+  const toast = useStudio((s) => s.toast)
+  const runStage = useStudio((s) => s.runStage)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [cookies, setCookies] = useState(false)
+
+  useEffect(() => {
+    api.getSettings().then((s) => setCookies(!!s.cookies_configured)).catch(() => {})
+  }, [])
+
+  return (
+    <div className="fade-in flex flex-col gap-4 rounded-2xl border border-line-strong p-4">
+      <div className="text-sm font-semibold">How to get this video</div>
+      <div className={needsCookies ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4'}>
+        {needsCookies && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              <Cookie className="size-3.5" /> 1 · Add YouTube cookies, then retry
+            </div>
+            <CookiesField
+              configured={cookies}
+              compact
+              onChange={(s) => {
+                const ok = !!s.cookies_configured
+                setCookies(ok)
+                if (ok) runStage('download')
+              }}
+            />
+            <p className="text-xs leading-relaxed text-neutral-500">
+              In a private/incognito window sign in to YouTube, export <b>youtube.com</b> cookies as <code>cookies.txt</code> (“Get cookies.txt LOCALLY” extension), close the window, then upload the file here — the download restarts automatically.
+            </p>
+            {cookies && (
+              <Button size="sm" icon={<RotateCcw className="size-3.5" />} onClick={() => runStage('download')} className="self-start">
+                Retry with cookies
+              </Button>
+            )}
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+            <Upload className="size-3.5" /> {needsCookies ? '2 · Or' : 'Or'} upload the video file
+          </div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="video/*,audio/*"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setUploading(true)
+              try {
+                await api.replaceSource(project.id, file)
+                toast(`Using ${file.name} as the source`, 'success')
+              } catch (err: any) {
+                toast(err.message, 'error')
+              } finally {
+                setUploading(false)
+              }
+            }}
+          />
+          <Button icon={<Upload className="size-4" />} loading={uploading} onClick={() => fileInput.current?.click()} className="self-start">
+            Choose a video file
+          </Button>
+          <p className="text-xs text-neutral-500">Keeps this project and its settings; the rest of the pipeline works exactly the same.</p>
         </div>
       </div>
     </div>
