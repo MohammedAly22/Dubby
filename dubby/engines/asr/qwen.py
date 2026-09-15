@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from dubby.engines.asr.common import LANGUAGE_NAMES, SR, align_words, batched, clip, load_audio, vad_regions
+from dubby import languages as L
+from dubby.engines.asr.common import SR, align_words, batched, clip, load_audio, vad_regions
 from dubby.engines.base import ASREngine, EngineInfo, ParamSpec, option
 from dubby.workers.protocol import TaskContext
 
 FORCED_ALIGNER = "Qwen/Qwen3-ForcedAligner-0.6B"
+# Languages supported by Qwen3-ForcedAligner-0.6B (others fall back to wav2vec2 alignment).
+ALIGNER_LANGUAGES = {"en", "zh", "ja", "fr", "es", "it"}
 
 
 def _items(time_stamps: Any) -> List[Any]:
@@ -28,8 +31,8 @@ class Qwen3ASREngine(ASREngine):
         kind="asr",
         name="Qwen3-ASR",
         family="qwen",
-        description="State-of-the-art open ASR (52 languages). English timings come from Qwen3-ForcedAligner; Arabic uses wav2vec2 alignment.",
-        source_languages=["en", "ar"],
+        description="State-of-the-art open ASR (52 languages). Word timings from Qwen3-ForcedAligner for English, Chinese, Japanese, Spanish, French and Italian; wav2vec2 alignment for Arabic and Hindi.",
+        source_languages=["en", "ar", "es", "fr", "it", "hi", "zh", "ja"],
         requires=["qwen_asr", "silero_vad", "whisperx"],
         install="pip install qwen-asr silero-vad whisperx  (qwen family interpreter)",
         badges=["SOTA", "forced aligner"],
@@ -38,7 +41,7 @@ class Qwen3ASREngine(ASREngine):
             ParamSpec("model", "Checkpoint", "select", "Qwen/Qwen3-ASR-1.7B", [
                 option("Qwen/Qwen3-ASR-1.7B", "Qwen3-ASR 1.7B"), option("Qwen/Qwen3-ASR-0.6B", "Qwen3-ASR 0.6B"),
             ]),
-            ParamSpec("use_forced_aligner", "Qwen3 forced aligner (English)", "bool", True),
+            ParamSpec("use_forced_aligner", "Qwen3 forced aligner", "bool", True, help="Used for en · zh · ja · es · fr · it; other languages use wav2vec2."),
             ParamSpec("batch_size", "Batch size", "number", 8, min=1, max=64, step=1),
             ParamSpec("chunk_seconds", "Max chunk (s)", "number", 30, min=5, max=120, step=1),
         ],
@@ -70,8 +73,12 @@ class Qwen3ASREngine(ASREngine):
         audio = load_audio(audio_path)
         ctx.progress(0.05, "Detecting speech (VAD)…")
         regions = vad_regions(audio, max_chunk=float(self.params.get("chunk_seconds", 30)))
-        lang_name = LANGUAGE_NAMES.get(language, "English")
-        native_ts = bool(self.params.get("use_forced_aligner")) and language == "en" and getattr(self.model, "forced_aligner", True) is not None
+        lang_name = L.get(language).qwen
+        native_ts = (
+            bool(self.params.get("use_forced_aligner"))
+            and language in ALIGNER_LANGUAGES
+            and getattr(self.model, "forced_aligner", True) is not None
+        )
         segments: List[Dict[str, Any]] = []
         batches = list(batched(regions, int(self.params.get("batch_size", 8))))
         for bi, batch in enumerate(batches):

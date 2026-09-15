@@ -11,6 +11,7 @@ import traceback
 from typing import Any, Dict, Optional
 
 from dubby.engines.base import Engine, TTSItem
+from dubby.languages import join_tokens
 from dubby.engines.registry import engine_class
 from dubby.pipeline.chunking import build_chunks
 from dubby.workers.protocol import Channel, TaskContext
@@ -66,6 +67,16 @@ class Worker:
             ctx.progress(0.97, "Building dubbing chunks…")
             chunks = build_chunks(raw, **payload.get("chunking", {}))
             return {"segments": chunks}
+
+        if kind == "asr_ref":
+            ctx.progress(0.05, "Transcribing the reference voice…")
+            raw = engine.transcribe(payload["audio"], payload["language"], ctx)
+            text = join_tokens([s.get("text", "") for s in raw], payload["language"])
+            ctx.progress(1.0, "Reference transcribed")
+            return {"text": text}
+
+        if kind == "langid":
+            return engine.detect(payload["audio"], ctx)
 
         if kind == "translation":
             items = payload["items"]

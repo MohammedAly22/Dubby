@@ -6,11 +6,10 @@ import os
 from collections import OrderedDict
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
+from dubby import languages as L
 from dubby.engines.asr.common import batched
 from dubby.engines.base import ParamSpec, TTSEngine, TTSItem, option
 from dubby.workers.protocol import TaskContext
-
-LANGUAGE_IDS = {"arz": "arz", "arb": "arb"}
 
 
 def omnivoice_params(default_model: str, extra: Optional[List[ParamSpec]] = None) -> List[ParamSpec]:
@@ -63,7 +62,8 @@ class OmniVoiceEngine(TTSEngine):
 
     def prepare_text(self, text: str, target: str) -> str:
         text = " ".join(text.split())
-        norm = self.normalizer() if self.params.get("normalize", True) else None
+        # The VoiceTut normalizer is Arabic-specific; other languages use OmniVoice's own normalization.
+        norm = self.normalizer() if self.params.get("normalize", True) and L.is_arabic(target) else None
         return norm.normalize(text) if norm else text
 
     # --------------------------------------------------------------- voices
@@ -84,7 +84,8 @@ class OmniVoiceEngine(TTSEngine):
         prompts = [self._prompt(it.ref_audio, it.ref_text) for it in batch]
         kwargs: Dict[str, Any] = dict(
             text=texts,
-            language=[LANGUAGE_IDS[target]] * len(batch),
+            language=[L.get(target).omnivoice] * len(batch),
+            normalize_text=bool(self.params.get("normalize", True)) and not L.is_arabic(target),
             num_step=int(self.params["num_step"]),
             guidance_scale=float(self.params["guidance_scale"]),
             denoise=bool(self.params.get("denoise", True)),

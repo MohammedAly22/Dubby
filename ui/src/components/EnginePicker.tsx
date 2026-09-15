@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, ExternalLink, Lock, SlidersHorizontal } from 'lucide-react'
-import { useStudio } from '../store'
-import type { EngineChoice, EngineInfo, ParamSpec } from '../types'
+import { ChevronDown, ExternalLink, Lock, SlidersHorizontal, Sparkles, Star } from 'lucide-react'
+import { recommendationsFor, useStudio } from '../store'
+import type { EngineChoice, EngineInfo, ParamSpec, Recommendation } from '../types'
 import { cls } from '../utils'
+import { LangLabel } from './Flags'
 import { Select } from './Select'
-import { Badge, Switch, inputCls } from './ui'
+import { Badge, Button, Switch, inputCls } from './ui'
 
 export function EnginePicker({
   kind,
@@ -23,18 +24,27 @@ export function EnginePicker({
 }) {
   const all = useStudio((s) => s.engines)
   const loading = useStudio((s) => s.enginesLoading)
+  const languages = useStudio((s) => s.languages)
   const [showParams, setShowParams] = useState(false)
+
+  const recs = useMemo(() => recommendationsFor(languages, kind, source, target), [languages, kind, source, target])
+  const rank = useMemo(() => new Map(recs.map((r, i) => [r.engine, { index: i, rec: r }])), [recs])
 
   const engines = useMemo(() => {
     const ok = (e: EngineInfo) =>
-      (!source || e.source_languages.length === 0 || e.source_languages.includes(source)) && (!target || e.targets.length === 0 || e.targets.includes(target))
+      (kind === 'tts' || !source || e.source_languages.length === 0 || e.source_languages.includes(source)) &&
+      (kind === 'asr' || !target || e.targets.length === 0 || e.targets.includes(target))
+    const score = (e: EngineInfo) => rank.get(e.id)?.index ?? 99
     return all
       .filter((e) => e.kind === kind)
       .map((e) => ({ e, compatible: ok(e) }))
-      .sort((a, b) => Number(b.compatible) - Number(a.compatible) || Number(b.e.available) - Number(a.e.available))
-  }, [all, kind, source, target])
+      .sort((a, b) => Number(b.compatible) - Number(a.compatible) || score(a.e) - score(b.e) || Number(b.e.available) - Number(a.e.available))
+  }, [all, kind, source, target, rank])
 
   const selected = all.find((e) => e.id === choice.engine)
+  const topAvailable: Recommendation | undefined = recs.find((r) => all.find((e) => e.id === r.engine)?.available) ?? recs[0]
+  const topEngine = topAvailable ? all.find((e) => e.id === topAvailable.engine) : undefined
+  const langCode = kind === 'asr' ? source : target
 
   if (!all.length) {
     return <div className="shimmer h-24 rounded-2xl" title={loading ? 'Checking engines…' : 'No engines'} />
@@ -42,37 +52,61 @@ export function EnginePicker({
 
   return (
     <div className="flex flex-col gap-3">
+      {topAvailable && topEngine && topAvailable.engine !== choice.engine && (
+        <div className="fade-in flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line-strong bg-white/[.03] px-3 py-2.5">
+          <div className="flex min-w-0 items-start gap-2 text-xs text-neutral-300">
+            <Sparkles className="mt-0.5 size-3.5 shrink-0" />
+            <span className="min-w-0">
+              Recommended {langCode && <>for <LangLabel code={kind === 'translation' ? `${target}` : langCode} size={10} /></>}:{' '}
+              <b className="text-white">{topEngine.name}</b>
+              <span className="block text-neutral-500">{topAvailable.reason}</span>
+            </span>
+          </div>
+          <Button size="sm" variant="primary" disabled={disabled} onClick={() => onChange({ engine: topAvailable.engine, params: { ...topAvailable.params } })}>
+            Use recommended
+          </Button>
+        </div>
+      )}
+
       <div className="stagger grid gap-2 sm:grid-cols-2">
         {engines.map(({ e, compatible }, i) => {
           const active = e.id === choice.engine
+          const r = rank.get(e.id)
           return (
             <button
               key={e.id}
               style={{ ['--i' as string]: Math.min(i, 10) }}
               type="button"
               disabled={disabled || !compatible}
-              onClick={() => onChange({ engine: e.id, params: e.id === choice.engine ? choice.params : {} })}
+              onClick={() => onChange({ engine: e.id, params: e.id === choice.engine ? choice.params : { ...(r?.rec.params ?? {}) } })}
               className={cls(
                 'lift group flex flex-col gap-1.5 rounded-2xl border p-3 text-left',
                 active ? 'border-white bg-white/[.06]' : 'border-line bg-black/30 hover:border-neutral-600',
                 !compatible && 'opacity-35',
               )}
-              title={!compatible ? 'Not compatible with the selected languages' : e.description}
+              title={!compatible ? 'Not compatible with the selected languages' : r ? `Recommended: ${r.rec.reason}` : e.description}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className={cls('size-2 rounded-full transition-all duration-300', active ? 'pulse-ring bg-white' : 'bg-neutral-700 group-hover:bg-neutral-500')} />
-                  <span className="text-sm font-semibold">{e.name}</span>
-                  {e.gated && <Lock className="size-3 text-neutral-500" aria-label="gated model" />}
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={cls('size-2 shrink-0 rounded-full transition-all duration-300', active ? 'pulse-ring bg-white' : 'bg-neutral-700 group-hover:bg-neutral-500')} />
+                  <span className="truncate text-sm font-semibold">{e.name}</span>
+                  {e.gated && <Lock className="size-3 shrink-0 text-neutral-500" aria-label="gated model" />}
                 </div>
                 {e.available ? (
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-300">ready</span>
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-neutral-300">ready</span>
                 ) : (
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600" title={`missing: ${e.missing.join(', ')}\n${e.install}`}>
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" title={`missing: ${e.missing.join(', ')}\n${e.install}`}>
                     not installed
                   </span>
                 )}
               </div>
+              {r && compatible && (
+                <span className="flex items-center gap-1 text-[11px] text-neutral-300">
+                  <Star className={cls('size-3', r.index === 0 && 'fill-current')} />
+                  {r.index === 0 ? 'Top pick' : `Recommended #${r.index + 1}`}
+                  <span className="truncate text-neutral-500">· {r.rec.reason}</span>
+                </span>
+              )}
               <p className="line-clamp-2 text-xs leading-relaxed text-neutral-500">{e.description}</p>
               <div className="flex flex-wrap gap-1">
                 <Badge tone="muted">{e.family}</Badge>

@@ -12,8 +12,6 @@ from dubby.workers.protocol import TaskContext
 SR = 16000
 T = TypeVar("T")
 
-LANGUAGE_NAMES = {"en": "English", "ar": "Arabic"}
-
 
 def load_audio(path: str, sr: int = SR) -> np.ndarray:
     import soundfile as sf
@@ -110,7 +108,9 @@ def align_words(
     """
     if not segments:
         return segments
-    lang = "ar" if language.startswith("ar") else "en"
+    from dubby import languages
+
+    lang = languages.iso(language) if language in languages.LANGUAGES else language
     try:
         import whisperx
 

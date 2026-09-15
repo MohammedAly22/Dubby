@@ -22,10 +22,19 @@ ENGINES: Dict[str, str] = {
     "emhotob": "dubby.engines.translation.emhotob:EmhotobTranslator",
     "jisr": "dubby.engines.translation.jisr:JisrTranslator",
     "masrawy": "dubby.engines.translation.masrawy:MasrawyTranslator",
+    "hunyuan-mt": "dubby.engines.translation.hunyuan:HunyuanMTTranslator",
+    "nllb": "dubby.engines.translation.nllb:NLLBTranslator",
+    "indictrans2": "dubby.engines.translation.indictrans2:IndicTrans2Translator",
     "llm": "dubby.engines.translation.llm:LLMTranslator",
+    "passthrough": "dubby.engines.translation.passthrough:PassthroughTranslator",
     # ---------------------------------------------------------------- TTS
     "voicetut": "dubby.engines.tts.voicetut:VoiceTutEngine",
     "lahgtna-omnivoice": "dubby.engines.tts.lahgtna:LahgtnaOmniVoiceEngine",
+    "omnivoice": "dubby.engines.tts.omnivoice:OmniVoiceBaseEngine",
+    "qwen3-tts": "dubby.engines.tts.qwen3_tts:Qwen3TTSEngine",
+    "indicf5": "dubby.engines.tts.indicf5:IndicF5Engine",
+    # ------------------------------------------------------ language ID
+    "whisper-langid": "dubby.engines.langid.whisper_langid:WhisperLangIdEngine",
     # --------------------------------------------------------- separation
     "demucs": "dubby.engines.separation.demucs_engine:DemucsEngine",
 }

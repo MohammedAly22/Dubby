@@ -18,7 +18,7 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
-ENGINE_FAMILIES = ("core", "qwen", "nemo")
+ENGINE_FAMILIES = ("core", "qwen", "nemo", "indic")
 
 
 def default_home() -> Path:

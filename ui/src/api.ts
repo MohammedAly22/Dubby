@@ -1,4 +1,4 @@
-import type { EngineChoice, EngineInfo, ExportItem, JobsSnapshot, LogEvent, Preset, Project, ProjectSummary, Segment } from './types'
+import type { EngineChoice, EngineInfo, ExportItem, JobsSnapshot, LanguagesPayload, LogEvent, Preset, Project, ProjectSummary, Segment } from './types'
 
 const BASE = 'api'
 
@@ -38,6 +38,10 @@ export const api = {
   stopWorkers: () => req<JobsSnapshot>('/workers/stop', json('POST')),
   logs: (limit = 400) => req<LogEvent[]>(`/logs?limit=${limit}`),
   presets: () => req<Preset[]>('/voices/presets'),
+  languages: () => req<LanguagesPayload>('/languages'),
+  detectLanguage: (id: string, engine?: string, params?: Record<string, unknown>) => req<{ ok: boolean }>(`/projects/${id}/detect-language`, json('POST', { engine, params })),
+  applyRecommendations: (id: string, stages?: string[]) => req<Project>(`/projects/${id}/recommendations/apply`, json('POST', { stages })),
+  transcribeVoice: (id: string, body: { engine?: string | null; language?: string | null }) => req<{ ok: boolean }>(`/projects/${id}/voice/transcribe`, json('POST', body)),
 
   projects: () => req<ProjectSummary[]>('/projects'),
   project: (id: string) => req<Project>(`/projects/${id}`),
@@ -59,10 +63,13 @@ export const api = {
   run: (id: string, stage: string, body: RunBody = {}) => req<{ ok: boolean }>(`/projects/${id}/stages/${stage}/run`, json('POST', body)),
   cancel: (id: string, stage: string) => req<{ cancelled: number }>(`/projects/${id}/stages/${stage}/cancel`, json('POST')),
   setVoice: (id: string, body: Record<string, unknown>) => req<Project>(`/projects/${id}/voice`, json('PUT', body)),
-  uploadVoice: (id: string, file: File, ref_text: string) => {
+  uploadVoice: (id: string, file: File, ref_text: string, opts: { autoTranscribe?: boolean; engine?: string | null; language?: string | null } = {}) => {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('ref_text', ref_text)
+    fd.append('auto_transcribe', String(opts.autoTranscribe ?? true))
+    fd.append('asr_engine', opts.engine ?? '')
+    fd.append('language', opts.language ?? '')
     return req<Project>(`/projects/${id}/voice/upload`, { method: 'POST', body: fd })
   },
   render: (id: string, mix?: Record<string, unknown>) => req<{ ok: boolean }>(`/projects/${id}/render`, json('POST', { mix })),

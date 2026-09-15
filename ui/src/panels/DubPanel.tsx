@@ -8,6 +8,7 @@ import { playPreview, stopPreview, usePlayer } from '../player'
 import { useStudio } from '../store'
 import type { Project, Segment } from '../types'
 import { cls, fmtTime, isBusy, isStale } from '../utils'
+import { isArabic, isRtl } from '../components/Flags'
 import { DiacriticsBar } from './DiacriticsBar'
 
 export function DubPanel({ project, onNext, onVoice }: { project: Project; onNext: () => void; onVoice: () => void }) {
@@ -84,9 +85,9 @@ export function DubPanel({ project, onNext, onVoice }: { project: Project; onNex
             Preview on video
           </Button>
         </div>
-        <DiacriticsBar />
+        {isArabic(project.settings.target) && <DiacriticsBar />}
         {translated.map((s) => (
-          <DubRow key={s.id} seg={s} index={project.segments.indexOf(s)} projectId={project.id} />
+          <DubRow key={s.id} seg={s} index={project.segments.indexOf(s)} projectId={project.id} rtl={isRtl(project.settings.target)} />
         ))}
       </div>
     </div>
@@ -102,7 +103,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-const DubRow = memo(function DubRow({ seg, index, projectId }: { seg: Segment; index: number; projectId: string }) {
+const DubRow = memo(function DubRow({ seg, index, projectId, rtl }: { seg: Segment; index: number; projectId: string; rtl: boolean }) {
   const updateSegment = useStudio((s) => s.updateSegment)
   const runStage = useStudio((s) => s.runStage)
   const select = useStudio((s) => s.select)
@@ -155,7 +156,7 @@ const DubRow = memo(function DubRow({ seg, index, projectId }: { seg: Segment; i
         </div>
       </div>
 
-      <AutoTextarea rtl value={seg.translation} onCommit={(translation) => updateSegment(seg.id, { translation })} />
+      <AutoTextarea rtl={rtl} value={seg.translation} onCommit={(translation) => updateSegment(seg.id, { translation })} />
 
       <div className="flex items-center gap-3 px-1">
         <button

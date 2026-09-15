@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { api, wsUrl, type RunBody } from './api'
-import type { AsrPreviewSegment, EngineChoice, EngineInfo, JobsSnapshot, LogEvent, Project, ProjectSummary, Segment } from './types'
+import type { AsrPreviewSegment, EngineChoice, EngineInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, Segment } from './types'
 import { debounceByKey } from './utils'
 
 export interface Toast {
@@ -16,6 +16,8 @@ interface StudioState {
   project: Project | null
   engines: EngineInfo[]
   enginesLoading: boolean
+  languages: LanguagesPayload | null
+  loadLanguages: () => Promise<void>
   families: Record<string, any>
   jobs: JobsSnapshot | null
   logs: LogEvent[]
@@ -91,6 +93,14 @@ export const useStudio = create<StudioState>((set, get) => ({
   project: null,
   engines: [],
   enginesLoading: false,
+  languages: null,
+  loadLanguages: async () => {
+    try {
+      set({ languages: await api.languages() })
+    } catch {
+      /* retried on reconnect */
+    }
+  },
   families: {},
   jobs: null,
   logs: [],
@@ -108,6 +118,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       retry = 0
       set({ connected: true, backendReachable: true })
       api.logs().then((logs) => set({ logs })).catch(() => {})
+      if (!get().languages) get().loadLanguages()
       const p = get().project
       if (p) get().openProject(p.id)
     }
@@ -207,6 +218,21 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
   },
 }))
+
+/** Ranked engine recommendations for a stage and language pair. */
+export function recommendationsFor(
+  payload: LanguagesPayload | null,
+  kind: EngineInfo['kind'],
+  source?: string,
+  target?: string,
+): Recommendation[] {
+  if (!payload) return []
+  const r = payload.recommendations
+  if (kind === 'asr') return (source && r.asr[source]) || []
+  if (kind === 'tts') return (target && r.tts[target]) || []
+  if (kind === 'translation') return (source && target && r.translation[`${source}>${target}`]) || []
+  return []
+}
 
 function deepMerge(base: Record<string, any>, patch: Record<string, any>): any {
   const out: Record<string, any> = { ...base }

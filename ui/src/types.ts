@@ -1,7 +1,9 @@
 export type StageStatus = 'idle' | 'queued' | 'running' | 'done' | 'error' | 'cancelled'
 export type StageName = 'download' | 'asr' | 'translation' | 'voice' | 'tts' | 'separation' | 'render'
-export type SourceLanguage = 'en' | 'ar'
-export type TargetDialect = 'arz' | 'arb'
+/** Spoken language code: en · ar · es · fr · it · hi · zh · ja */
+export type SourceLanguage = string
+/** Dub language code: arz · arb · en · es · fr · it · hi · zh · ja */
+export type TargetDialect = string
 
 export interface StageState {
   status: StageStatus
@@ -65,6 +67,8 @@ export interface VoiceConfig {
   clip_end?: number | null
   ref_audio?: string | null
   ref_text: string
+  ref_language?: string | null
+  ref_text_status: 'idle' | 'queued' | 'running' | 'done' | 'error'
   upload_name?: string | null
 }
 
@@ -92,6 +96,27 @@ export interface SourceInfo {
   audio_hq?: string | null
   vocals?: string | null
   background?: string | null
+  auto_detect?: boolean
+  detected_language?: string | null
+  detected_probability?: number | null
+  detected_candidates?: [string, number][]
+}
+
+export interface Recommendation {
+  engine: string
+  reason: string
+  params: Record<string, unknown>
+}
+
+export interface LanguagesPayload {
+  languages: { code: string; name: string; native: string; flag: string; rtl: boolean; source: boolean; target: boolean; omnivoice_hours: number }[]
+  sources: string[]
+  targets: string[]
+  recommendations: {
+    asr: Record<string, Recommendation[]>
+    tts: Record<string, Recommendation[]>
+    translation: Record<string, Recommendation[]>
+  }
 }
 
 export interface RenderInfo {

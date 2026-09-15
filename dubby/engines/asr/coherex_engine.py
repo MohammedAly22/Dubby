@@ -15,7 +15,7 @@ class CohereXEngine(ASREngine):
         name="CohereX",
         family="core",
         description="WhisperX-style pipeline around Cohere Transcribe: VAD → Cohere ASR → wav2vec2 forced alignment.",
-        source_languages=["ar", "en"],
+        source_languages=["ar", "en", "es", "fr", "it", "zh", "ja"],
         requires=["coherex"],
         install="pip install coherex",
         gated=True,

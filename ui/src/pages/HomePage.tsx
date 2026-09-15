@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Clock, FileVideo, Trash2, Youtube } from 'lucide-react'
 import { api } from '../api'
-import { Flag, LANGS, SOURCE_OPTIONS, TARGET_OPTIONS, type FlagCode } from '../components/Flags'
+import { Flag, lang, SOURCE_OPTIONS_WITH_AUTO, TARGET_OPTIONS, type FlagCode } from '../components/Flags'
 import { Select } from '../components/Select'
 import { Button, StatusIcon } from '../components/ui'
 import { useStudio } from '../store'
@@ -16,10 +16,15 @@ const PIPELINE = [
   ['render', 'Render'],
 ] as const
 
-const HERO_WORDS: { text: string; flag?: FlagCode }[] = [
-  { text: 'العربي' },
-  { text: 'مصري', flag: 'eg' },
-  { text: 'فصحى', flag: 'sa' },
+const HERO_WORDS: { text: string; flag?: FlagCode; arabic?: boolean }[] = [
+  { text: 'مصري', flag: 'eg', arabic: true },
+  { text: 'فصحى', flag: 'sa', arabic: true },
+  { text: 'Español', flag: 'es' },
+  { text: 'Français', flag: 'fr' },
+  { text: 'Italiano', flag: 'it' },
+  { text: 'हिन्दी', flag: 'in' },
+  { text: '中文', flag: 'cn' },
+  { text: '日本語', flag: 'jp' },
 ]
 
 export function HomePage() {
@@ -28,7 +33,7 @@ export function HomePage() {
   const closeProject = useStudio((s) => s.closeProject)
   const toast = useStudio((s) => s.toast)
   const [url, setUrl] = useState('')
-  const [source, setSource] = useState<SourceLanguage>('en')
+  const [source, setSource] = useState<SourceLanguage>('auto')
   const [target, setTarget] = useState<TargetDialect>('arz')
   const [busy, setBusy] = useState(false)
   const [word, setWord] = useState(0)
@@ -77,18 +82,18 @@ export function HomePage() {
         <div className="orb pointer-events-none absolute -bottom-52 left-10 size-[380px] rounded-full bg-white/[.04] blur-3xl" style={{ animationDelay: '-7s' }} />
         <div className="relative flex max-w-3xl flex-col gap-6">
           <span className="flex w-fit items-center gap-2 rounded-full border border-line-strong bg-black px-3 py-1 text-xs text-neutral-400">
-            <Flag code="us" size={10} />
-            <ArrowRight className="size-3" />
-            <Flag code="eg" size={10} />
-            <Flag code="sa" size={10} />
-            <span className="ml-1">ASR · Translation · Voice cloning · Mix</span>
+            {(['us', 'eg', 'sa', 'es', 'fr', 'it', 'in', 'cn', 'jp'] as FlagCode[]).map((f) => (
+              <Flag key={f} code={f} size={10} />
+            ))}
+            <span className="ml-1">9 languages · ASR · Translation · Voice cloning · Mix</span>
           </span>
           <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-6xl">
             Dub any YouTube video
             <br />
             <span className="text-neutral-500">into</span>{' '}
+            {/* rotates through every supported dub language */}
             <span key={word} className="word-in inline-flex items-center gap-3 align-middle">
-              <span className="font-arabic font-semibold" style={{ lineHeight: 1.2 }}>
+              <span className={cls('font-semibold', hero.arabic && 'font-arabic')} style={{ lineHeight: 1.2 }}>
                 {hero.text}
               </span>
               {hero.flag && <Flag code={hero.flag} size={30} className="rounded-md" />}
@@ -123,11 +128,11 @@ export function HomePage() {
             <div className="flex flex-wrap items-center gap-3 px-1 text-xs text-neutral-500">
               <span className="flex items-center gap-2">
                 from
-                <Select<SourceLanguage> size="sm" value={source} onChange={setSource} options={SOURCE_OPTIONS} className="w-36" menuWidth={250} />
+                <Select<SourceLanguage> size="sm" value={source} onChange={setSource} options={SOURCE_OPTIONS_WITH_AUTO} className="w-40" menuWidth={280} />
               </span>
               <span className="flex items-center gap-2">
                 to
-                <Select<TargetDialect> size="sm" value={target} onChange={setTarget} options={TARGET_OPTIONS} className="w-52" menuWidth={270} />
+                <Select<TargetDialect> size="sm" value={target} onChange={setTarget} options={TARGET_OPTIONS} className="w-52" menuWidth={300} />
               </span>
               <button type="button" onClick={() => fileInput.current?.click()} className="flex items-center gap-1.5 underline-offset-4 transition-colors hover:text-white hover:underline">
                 <FileVideo className="size-3.5" /> or upload a video file
@@ -159,8 +164,8 @@ export function HomePage() {
 
 function ProjectCard({ p, index, onDeleted }: { p: ProjectSummary; index: number; onDeleted: () => void }) {
   const toast = useStudio((s) => s.toast)
-  const src = LANGS[p.settings.source_language]
-  const tgt = LANGS[p.settings.target]
+  const src = lang(p.settings.source_language)
+  const tgt = lang(p.settings.target)
   return (
     <a
       href={`#/p/${p.id}`}

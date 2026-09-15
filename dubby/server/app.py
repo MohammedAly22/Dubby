@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from dubby import languages, recommend
 from dubby.config import save_settings
 from dubby.core import voices
 from dubby.core.studio import Studio, StudioError
@@ -25,7 +26,7 @@ mimetypes.add_type("application/x-subrip", ".srt")
 
 class CreateProject(BaseModel):
     url: str
-    source_language: str = "en"
+    source_language: str = "auto"
     target: str = "arz"
 
 
@@ -118,6 +119,10 @@ def create_app(studio: Studio) -> FastAPI:
     async def engines(refresh: bool = False):
         return await run_in_threadpool(studio.engines, refresh)
 
+    @app.get("/api/languages")
+    async def get_languages():
+        return {**languages.public(), "recommendations": recommend.matrix()}
+
     @app.get("/api/jobs")
     async def jobs():
         return studio.jobs.snapshot()
@@ -157,7 +162,7 @@ def create_app(studio: Studio) -> FastAPI:
         return p.model_dump()
 
     @app.post("/api/projects/upload")
-    async def upload_project(file: UploadFile = File(...), source_language: str = Form("en"), target: str = Form("arz")):
+    async def upload_project(file: UploadFile = File(...), source_language: str = Form("auto"), target: str = Form("arz")):
         data = await file.read()
         p = await run_in_threadpool(studio.create_project_from_file, file.filename or "video.mp4", data, source_language, target)
         return p.model_dump()
@@ -204,9 +209,32 @@ def create_app(studio: Studio) -> FastAPI:
         return (await run_in_threadpool(studio.set_voice, pid, body)).model_dump()
 
     @app.post("/api/projects/{pid}/voice/upload")
-    async def upload_voice(pid: str, file: UploadFile = File(...), ref_text: str = Form("")):
+    async def upload_voice(
+        pid: str,
+        file: UploadFile = File(...),
+        ref_text: str = Form(""),
+        auto_transcribe: bool = Form(True),
+        asr_engine: str = Form(""),
+        language: str = Form(""),
+    ):
         data = await file.read()
-        return (await run_in_threadpool(studio.upload_voice, pid, file.filename or "voice.wav", data, ref_text)).model_dump()
+        project = await run_in_threadpool(studio.upload_voice, pid, file.filename or "voice.wav", data, ref_text, auto_transcribe, asr_engine or None, language or None)
+        return project.model_dump()
+
+    @app.post("/api/projects/{pid}/voice/transcribe")
+    async def transcribe_voice(pid: str, body: Dict[str, Any]):
+        await run_in_threadpool(studio.transcribe_voice_reference, pid, body.get("engine") or None, body.get("language") or None, body.get("params"))
+        return {"ok": True}
+
+    @app.post("/api/projects/{pid}/detect-language")
+    async def detect_language(pid: str, body: RunStage):
+        await run_in_threadpool(studio.run_langid, pid, body.engine or "whisper-langid", body.params)
+        return {"ok": True}
+
+    @app.post("/api/projects/{pid}/recommendations/apply")
+    async def apply_recommendations(pid: str, body: Dict[str, Any]):
+        stages = tuple(body.get("stages") or ("asr", "translation", "tts"))
+        return (await run_in_threadpool(studio.apply_recommendations, pid, stages)).model_dump()
 
     @app.post("/api/projects/{pid}/render")
     async def render(pid: str, body: RenderBody):

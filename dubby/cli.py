@@ -19,6 +19,7 @@ from rich.text import Text
 from dubby import __version__
 from dubby.config import ENGINE_FAMILIES, load_settings
 from dubby.core.reporter import TerminalReporter, banner, console
+from dubby.languages import SOURCE_CODES, TARGET_CODES
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_DIR = ROOT / "ui"
@@ -170,6 +171,27 @@ def cmd_engines(_: argparse.Namespace) -> None:
     console.print(table)
 
 
+# ------------------------------------------------------------------- languages
+def cmd_languages(_: argparse.Namespace) -> None:
+    from dubby import languages as L
+    from dubby import recommend
+
+    table = Table(title="🌍 Languages & recommended engines", border_style="grey35", header_style="bold white", title_style="bold white", show_lines=True)
+    for col in ("code", "language", "spoken", "dub", "ASR (spoken)", "TTS (dub)", "OmniVoice data"):
+        table.add_column(col, overflow="fold")
+    for lang in L.LANGUAGES.values():
+        asr = " › ".join(r.engine for r in recommend.recommendations("asr", lang.code, "en")) if lang.source else "—"
+        tts = " › ".join(r.engine for r in recommend.recommendations("tts", "en", lang.code)) if lang.target else "—"
+        table.add_row(lang.code, f"{lang.name} · {lang.native}", "✓" if lang.source else "", "✓" if lang.target else "", asr, tts, f"{lang.omnivoice_hours:,.0f} h")
+    console.print(table)
+    pairs = Table(title="🔁 Translation (top pick per pair from English)", border_style="grey35", header_style="bold white", title_style="bold white")
+    pairs.add_column("pair")
+    pairs.add_column("ranked engines")
+    for tgt in L.TARGET_CODES:
+        pairs.add_row(f"en → {tgt}", " › ".join(r.engine for r in recommend.recommendations("translation", "en", tgt)))
+    console.print(pairs)
+
+
 # -------------------------------------------------------------------- projects
 def cmd_projects(_: argparse.Namespace) -> None:
     from dubby.core.storage import ProjectStore
@@ -206,6 +228,13 @@ def cmd_dub(args: argparse.Namespace) -> None:
         else:
             project = studio.create_project(args.url, args.source, args.target)
         check("download")
+        if args.source == "auto":
+            check("langid")
+        settings = studio.store.get(project.id).settings
+        console.print(
+            Text("  🧭 Engines  ", style="grey62")
+            + Text(f"ASR {args.asr or settings.asr.engine} · translation {args.translation or settings.translation.engine} · TTS {args.tts or settings.tts.engine}", style="bold white")
+        )
         studio.run_asr(project.id, args.asr, _params(args.asr_param))
         check("asr")
         studio.run_translation(project.id, args.translation, _params(args.translation_param))
@@ -269,17 +298,18 @@ def main(argv: List[str] | None = None) -> None:
     p.set_defaults(func=cmd_doctor)
 
     sub.add_parser("engines", help="list engines").set_defaults(func=cmd_engines)
+    sub.add_parser("languages", help="supported languages and recommended engines").set_defaults(func=cmd_languages)
     sub.add_parser("projects", help="list projects").set_defaults(func=cmd_projects)
 
     p = sub.add_parser("dub", help="dub a video end-to-end without the UI")
     p.add_argument("url", help="YouTube URL or local video file")
-    p.add_argument("--source", default="en", choices=["en", "ar"])
-    p.add_argument("--target", default="arz", choices=["arz", "arb"])
-    p.add_argument("--asr", default="whisperx")
+    p.add_argument("--source", default="auto", choices=["auto", *SOURCE_CODES], help="spoken language (auto = detect)")
+    p.add_argument("--target", default="arz", choices=list(TARGET_CODES), help="dub language")
+    p.add_argument("--asr", default=None, help="ASR engine (default: recommended for the language)")
     p.add_argument("--asr-param", action="append", metavar="KEY=VALUE")
-    p.add_argument("--translation", default="emhotob")
+    p.add_argument("--translation", default=None, help="translation engine (default: recommended)")
     p.add_argument("--translation-param", action="append", metavar="KEY=VALUE")
-    p.add_argument("--tts", default="voicetut")
+    p.add_argument("--tts", default=None, help="TTS engine (default: recommended)")
     p.add_argument("--tts-param", action="append", metavar="KEY=VALUE")
     p.add_argument("--voice", default="preset:Mohamed", help="preset:NAME | auto | clip:START-END | file:PATH")
     p.add_argument("--ref-text", default="", help="transcript of the file: voice")

@@ -13,8 +13,8 @@ class WhisperXEngine(ASREngine):
         kind="asr",
         name="WhisperX",
         family="core",
-        description="faster-whisper batched transcription with wav2vec2 forced alignment for precise word timings.",
-        source_languages=["en", "ar"],
+        description="faster-whisper batched transcription with wav2vec2 forced alignment (dedicated aligners for all supported languages).",
+        source_languages=["en", "ar", "es", "fr", "it", "hi", "zh", "ja"],
         requires=["whisperx"],
         install="pip install whisperx",
         badges=["word timestamps", "fast", "multilingual"],
@@ -23,6 +23,7 @@ class WhisperXEngine(ASREngine):
             ParamSpec("model", "Whisper model", "select", "large-v3-turbo", [
                 option("large-v3-turbo"), option("large-v3"), option("medium.en"), option("medium"),
                 option("small.en"), option("small"), option("base.en"), option("tiny.en"),
+                option("kotoba-tech/kotoba-whisper-v2.0-faster", "Kotoba-Whisper v2 (Japanese)"),
             ]),
             ParamSpec("batch_size", "Batch size", "number", 8, min=1, max=64, step=1),
             ParamSpec("vad_method", "VAD", "select", "silero", [option("silero", "Silero (bundled)"), option("pyannote", "pyannote")]),

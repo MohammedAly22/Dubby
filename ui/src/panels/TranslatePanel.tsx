@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { AlertTriangle, ArrowRight, Languages, Play, RefreshCw } from 'lucide-react'
 import { EnginePicker } from '../components/EnginePicker'
-import { LangLabel } from '../components/Flags'
+import { isArabic, isRtl, TARGET_OPTIONS } from '../components/Flags'
+import { Select } from '../components/Select'
 import { StageHeader } from '../components/StageHeader'
 import { AutoTextarea, Button, Empty, IconButton, Progress, Segmented, StatusIcon } from '../components/ui'
 import { usePlayer } from '../player'
@@ -57,14 +58,7 @@ export function TranslatePanel({ project, onNext }: { project: Project; onNext: 
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-400">
         Target dialect
-        <Segmented<TargetDialect>
-          value={project.settings.target}
-          onChange={(v) => patchSettings({ target: v })}
-          options={[
-            { value: 'arz', label: <LangLabel code="arz" size={11} /> },
-            { value: 'arb', label: <LangLabel code="arb" size={11} /> },
-          ]}
-        />
+        <Select<TargetDialect> value={project.settings.target} onChange={(v) => patchSettings({ target: v })} options={TARGET_OPTIONS} className="w-64" menuWidth={300} />
       </div>
 
       <EnginePicker
@@ -83,16 +77,16 @@ export function TranslatePanel({ project, onNext }: { project: Project; onNext: 
           </span>
           <Progress value={done / project.segments.length} />
         </div>
-        <DiacriticsBar />
+        {isArabic(project.settings.target) && <DiacriticsBar />}
         {project.segments.map((s, i) => (
-          <TranslationRow key={s.id} seg={s} index={i} />
+          <TranslationRow key={s.id} seg={s} index={i} rtl={isRtl(project.settings.target)} />
         ))}
       </div>
     </div>
   )
 }
 
-const TranslationRow = memo(function TranslationRow({ seg, index }: { seg: Segment; index: number }) {
+const TranslationRow = memo(function TranslationRow({ seg, index, rtl }: { seg: Segment; index: number; rtl: boolean }) {
   const updateSegment = useStudio((s) => s.updateSegment)
   const runStage = useStudio((s) => s.runStage)
   const select = useStudio((s) => s.select)
@@ -133,7 +127,7 @@ const TranslationRow = memo(function TranslationRow({ seg, index }: { seg: Segme
         {working && !seg.translation ? (
           <div className="shimmer h-9 rounded-xl" />
         ) : (
-          <AutoTextarea rtl value={seg.translation} placeholder="…" onCommit={(translation) => updateSegment(seg.id, { translation })} />
+          <AutoTextarea rtl={rtl} value={seg.translation} placeholder="…" onCommit={(translation) => updateSegment(seg.id, { translation })} />
         )}
       </div>
     </div>

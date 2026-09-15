@@ -12,8 +12,11 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple  # noqa: F401
 
+from pydantic import ValidationError
+
+from dubby import languages, recommend
 from dubby.config import ENGINE_FAMILIES, Settings, load_settings
 from dubby.core import voices
 from dubby.core.events import EventBus
@@ -187,29 +190,52 @@ class Studio:
         self.pool.submit(self.engine_status, True)
 
     # ================================================================ projects
-    def create_project(self, url: str, source_language: str = "en", target: str = "arz") -> Project:
+    def _available_engines(self) -> Optional[Set[str]]:
+        with self._status_lock:
+            status = self._engine_status
+        if not status:
+            return None
+        return {eid for fam in status.values() for eid, entry in fam.get("engines", {}).items() if entry.get("available")}
+
+    def _new_settings(self, source_language: str, target: str) -> Tuple[ProjectSettings, bool]:
+        auto = source_language in ("auto", "", None)
+        source = "en" if auto else source_language
+        if source not in languages.SOURCE_CODES:
+            raise StudioError(f"Unsupported spoken language '{source_language}'. Choose one of: auto, {', '.join(languages.SOURCE_CODES)}.")
+        if target not in languages.TARGET_CODES:
+            raise StudioError(f"Unsupported dub language '{target}'. Choose one of: {', '.join(languages.TARGET_CODES)}.")
+        settings = ProjectSettings(source_language=source, target=target)
+        available = self._available_engines()
+        for stage in ("asr", "translation", "tts"):
+            rec = recommend.best(stage, source, target, available)
+            if rec:
+                setattr(settings, stage, EngineChoice(engine=rec.engine, params=dict(rec.params)))
+        return settings, auto
+
+    def create_project(self, url: str, source_language: str = "auto", target: str = "arz") -> Project:
         url = (url or "").strip()
         if not YOUTUBE_RE.match(url):
             raise StudioError("Please paste a valid YouTube link (youtube.com or youtu.be).")
+        settings, auto = self._new_settings(source_language, target)
         p = self.store.create(title="YouTube video")
         with self.store.mutate(p.id) as proj:
-            proj.source.kind, proj.source.url = "youtube", url
-            proj.settings = ProjectSettings(source_language=source_language, target=target)
-            if source_language == "ar":
-                proj.settings.asr = EngineChoice(engine="cohere-transcribe-arabic")
+            proj.source.kind, proj.source.url, proj.source.auto_detect = "youtube", url, auto
+            proj.settings = settings
         self.publish_project(p.id)
         self.bus.log(f"New project {p.id} ← {url}", project_id=p.id)
         self.pool.submit(self._prepare_source, p.id)
         return self.store.get(p.id)
 
-    def create_project_from_file(self, filename: str, data: bytes, source_language: str = "en", target: str = "arz") -> Project:
+    def create_project_from_file(self, filename: str, data: bytes, source_language: str = "auto", target: str = "arz") -> Project:
+        settings, auto = self._new_settings(source_language, target)
         p = self.store.create(title=Path(filename).stem)
         ext = Path(filename).suffix.lower() or ".mp4"
         dest = self.store.dir(p.id) / "source" / f"upload{ext}"
         dest.write_bytes(data)
         with self.store.mutate(p.id) as proj:
             proj.source.kind, proj.source.video, proj.title = "upload", f"source/{dest.name}", Path(filename).stem
-            proj.settings = ProjectSettings(source_language=source_language, target=target)
+            proj.source.auto_detect = auto
+            proj.settings = settings
         self.publish_project(p.id)
         self.pool.submit(self._prepare_source, p.id)
         return self.store.get(p.id)
@@ -255,6 +281,13 @@ class Studio:
                 if meta.get("title"):
                     proj.title = meta["title"]
                 title = proj.title
+                auto_detect = proj.source.auto_detect
+            if auto_detect:
+                # queue detection before marking the download done so waiters never see a gap
+                try:
+                    self.run_langid(project_id)
+                except StudioError as exc:
+                    self.bus.log(f"Language detection skipped: {exc}", "warning", project_id)
             self.set_stage(project_id, stage, status="done", progress=1.0, message=f"{title} · {int(duration // 60)}m{int(duration % 60):02d}s")
             self.publish_project(project_id)
         except Cancelled:
@@ -264,11 +297,134 @@ class Studio:
             self.set_stage(project_id, stage, status="error", error=str(exc), message="Failed")
 
     def update_settings(self, project_id: str, patch: Dict[str, Any]) -> Project:
-        with self.store.mutate(project_id) as p:
-            merged = _deep_merge(p.settings.model_dump(), patch)
-            p.settings = ProjectSettings.model_validate(merged)
+        try:
+            with self.store.mutate(project_id) as p:
+                merged = _deep_merge(p.settings.model_dump(), patch)
+                p.settings = ProjectSettings.model_validate(merged)
+        except ValidationError as exc:
+            raise StudioError("; ".join(err["msg"] for err in exc.errors())) from exc
+        # A language change re-picks the stages that depend on it (the previous engines were chosen
+        # for another language); engines explicitly sent in the same patch are kept.
+        affected: List[str] = []
+        if "source_language" in patch:
+            affected += ["asr", "translation"]
+        if "target" in patch:
+            affected += ["translation", "tts"]
+        stages = [s for s in dict.fromkeys(affected) if s not in patch]
+        if stages:
+            self.apply_recommendations(project_id, stages=stages, publish=False)
         self.publish_project(project_id)
         return self.store.get(project_id)
+
+    def apply_recommendations(
+        self,
+        project_id: str,
+        stages: Iterable[str] = ("asr", "translation", "tts"),
+        only_incompatible: bool = False,
+        publish: bool = True,
+    ) -> Project:
+        available = self._available_engines()
+        changed: List[str] = []
+        with self.store.mutate(project_id) as p:
+            source, target = p.settings.source_language, p.settings.target
+            for stage in stages:
+                current: EngineChoice = getattr(p.settings, stage)
+                if only_incompatible and current.engine and recommend.supports(current.engine, stage, source, target):
+                    continue
+                rec = recommend.best(stage, source, target, available)
+                if rec and (rec.engine != current.engine or not only_incompatible):
+                    setattr(p.settings, stage, EngineChoice(engine=rec.engine, params=dict(rec.params)))
+                    changed.append(f"{stage}={rec.engine}")
+        if changed:
+            self.bus.log(f"Recommended engines applied: {', '.join(changed)}", project_id=project_id)
+        if publish:
+            self.publish_project(project_id)
+        return self.store.get(project_id)
+
+    # ----------------------------------------------------------- language ID
+    def run_langid(self, project_id: str, engine: str = "whisper-langid", params: Optional[Dict[str, Any]] = None) -> Job:
+        p = self.store.get(project_id)
+        if not p.source.audio16k:
+            raise StudioError("The source audio is not ready yet.")
+        self._require_available(engine)
+        info = get_info(engine)
+
+        def on_done(data: Dict[str, Any]) -> None:
+            raw = data.get("language") or ""
+            probability = float(data.get("probability") or 0.0)
+            detected = languages.from_iso(raw)
+            with self.store.mutate(project_id) as proj:
+                proj.source.detected_language = raw
+                proj.source.detected_probability = probability
+                proj.source.detected_candidates = data.get("candidates", [])
+                proj.source.auto_detect = False
+                previous = proj.settings.source_language
+                if detected:
+                    proj.settings.source_language = detected
+            if detected:
+                self.apply_recommendations(project_id, stages=("asr", "translation"), publish=False)
+                msg = f"{languages.get(detected).name} · {probability:.0%} confidence"
+            else:
+                msg = f"Detected '{raw}' ({probability:.0%}) — not a supported spoken language, kept {languages.get(previous).name}"
+            self.set_stage(project_id, "langid", status="done", progress=1.0, message=msg)
+            self.publish_project(project_id)
+
+        handlers = JobHandlers(
+            on_start=lambda: self.set_stage(project_id, "langid", status="running", progress=0.0, message="Detecting the spoken language…", engine=engine),
+            on_progress=lambda v, m: self.set_stage(project_id, "langid", persist=False, progress=v, message=m),
+            on_done=on_done,
+            on_error=lambda e: self.set_stage(project_id, "langid", status="error", error=e, message="Failed"),
+            on_cancel=lambda: self.set_stage(project_id, "langid", status="cancelled", message="Cancelled"),
+        )
+        self.set_stage(project_id, "langid", status="queued", progress=0.0, message="Waiting for a worker…", engine=engine, error=None)
+        payload = {"audio": str(self.store.path(project_id, p.source.audio16k))}
+        return self.jobs.submit(Job(project_id, "langid", "langid", engine, {**info.defaults(), **(params or {})}, payload, handlers))
+
+    # --------------------------------------------------- reference transcript
+    def transcribe_voice_reference(self, project_id: str, engine: Optional[str] = None, language: Optional[str] = None, params: Optional[Dict[str, Any]] = None) -> Job:
+        """Transcribe the prepared reference clip with an ASR engine to use as the TTS reference text."""
+        p = self.store.get(project_id)
+        if not p.voice.ref_audio:
+            raise StudioError("Prepare a clip or upload a reference voice first.")
+        lang = language or p.voice.ref_language or p.settings.source_language
+        if lang not in languages.SOURCE_CODES:
+            raise StudioError(f"Unsupported reference language '{lang}'.")
+        if not engine:
+            current = p.settings.asr.engine
+            if current and recommend.supports(current, "asr", lang, p.settings.target):
+                engine = current
+            else:
+                rec = recommend.best("asr", lang, p.settings.target, self._available_engines())
+                engine = rec.engine if rec else None
+        if not engine:
+            raise StudioError("No ASR engine supports the reference language.")
+        info = get_info(engine)
+        if lang not in info.source_languages:
+            raise StudioError(f"{info.name} does not support {languages.get(lang).name}.")
+        self._require_available(engine)
+        run_params = {**info.defaults(), **(p.settings.asr.params if engine == p.settings.asr.engine else {}), **(params or {})}
+        payload = {"audio": str(self.store.path(project_id, p.voice.ref_audio)), "language": lang}
+
+        def set_status(status: str, **extra: Any) -> None:
+            with self.store.mutate(project_id) as proj:
+                proj.voice.ref_text_status = status  # type: ignore[assignment]
+                for key, value in extra.items():
+                    setattr(proj.voice, key, value)
+            self.publish_project(project_id)
+
+        def on_done(data: Dict[str, Any]) -> None:
+            text = str(data.get("text", "")).strip()
+            set_status("done", ref_text=text, ref_language=lang)
+            self.bus.log(f"Reference transcribed with {info.name}: {text[:160]}", project_id=project_id, source="voice")
+
+        handlers = JobHandlers(
+            on_start=lambda: set_status("running"),
+            on_done=on_done,
+            on_error=lambda e: (set_status("error"), self.bus.log(f"Reference transcription failed: {e}", "error", project_id, source="voice")),
+            on_cancel=lambda: set_status("idle"),
+        )
+        set_status("queued")
+        return self.jobs.submit(Job(project_id, "voice", "asr_ref", engine, run_params, payload, handlers))
 
     # ================================================================ segments
     def update_segment(self, project_id: str, seg_id: str, patch: Dict[str, Any]) -> Segment:
@@ -284,8 +440,10 @@ class Studio:
                 seg.start, seg.end = round(start, 3), round(end, 3)
                 seg.words = [w for w in seg.words if w.end > seg.start and w.start < seg.end]
             if "text" in patch and patch["text"].strip() != seg.text:
-                text = " ".join(str(patch["text"]).split())
-                tokens = text.split(" ")
+                lang = p.settings.source_language
+                raw_text = str(patch["text"]).strip()
+                text = " ".join(raw_text.split()) if languages.get(lang).spaced else raw_text
+                tokens = languages.tokenize(text, lang)
                 if len(tokens) == len(seg.words):
                     for w, t in zip(seg.words, tokens):
                         w.text = t
@@ -308,15 +466,16 @@ class Studio:
                 raise StudioError("This is the last segment — nothing to merge with.")
             nxt = p.segments[i + 1]
             both_translated = seg.translation_status == "done" and nxt.translation_status == "done"
+            merged_text = languages.join_tokens([seg.text, nxt.text], p.settings.source_language)
             merged = Segment(
                 id=seg.id,
                 start=seg.start,
                 end=nxt.end,
-                text=f"{seg.text} {nxt.text}".strip(),
+                text=merged_text,
                 words=seg.words + nxt.words,
-                translation=f"{seg.translation} {nxt.translation}".strip() if both_translated else "",
+                translation=languages.join_tokens([seg.translation, nxt.translation], p.settings.target) if both_translated else "",
                 translation_status="done" if both_translated else "pending",
-                translation_source=f"{seg.text} {nxt.text}".strip() if both_translated else None,
+                translation_source=merged_text if both_translated else None,
             )
             p.segments[i:i + 2] = [merged]
         self.publish_project(project_id)
@@ -327,7 +486,7 @@ class Studio:
             seg = p.segment(seg_id)
             i = p.segments.index(seg)
             try:
-                parts = split_segment_words(seg.model_dump(), int(word_index))
+                parts = split_segment_words(seg.model_dump(), int(word_index), languages.get(p.settings.source_language).spaced)
             except ValueError as exc:
                 raise StudioError(str(exc)) from exc
             p.segments[i:i + 1] = [Segment(**part) for part in parts]
@@ -344,6 +503,7 @@ class Studio:
     def run_stage(self, project_id: str, stage: str, engine: Optional[str] = None, params: Optional[Dict[str, Any]] = None, segment_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         runners: Dict[str, Callable[..., Any]] = {
             "download": lambda: self.pool.submit(self._prepare_source, project_id),
+            "langid": lambda: self.run_langid(project_id, engine or "whisper-langid", params),
             "asr": lambda: self.run_asr(project_id, engine, params),
             "translation": lambda: self.run_translation(project_id, engine, params, segment_ids),
             "tts": lambda: self.run_tts(project_id, engine, params, segment_ids),
@@ -378,7 +538,12 @@ class Studio:
         payload = {
             "audio": str(self.store.path(project_id, p.source.audio16k)),
             "language": lang,
-            "chunking": {"max_seconds": p.settings.max_chunk_seconds, "min_seconds": p.settings.min_chunk_seconds, "max_gap": p.settings.max_word_gap},
+            "chunking": {
+                "max_seconds": p.settings.max_chunk_seconds,
+                "min_seconds": p.settings.min_chunk_seconds,
+                "max_gap": p.settings.max_word_gap,
+                "spaced": languages.get(lang).spaced,
+            },
         }
         preview: List[Dict[str, Any]] = []
 
@@ -422,8 +587,8 @@ class Studio:
         info = get_info(choice.engine or "")
         self._require_available(info.id)
         source, target = p.settings.source_language, p.settings.target
-        if source not in info.source_languages or target not in info.targets:
-            raise StudioError(f"{info.name} cannot translate {source} → {target}.")
+        if not recommend.supports(info.id, "translation", source, target):
+            raise StudioError(f"{info.name} cannot translate {languages.get(source).name} → {languages.get(target).name}.")
         wanted = set(segment_ids) if segment_ids else None
         items = [
             {"id": s.id, "text": s.text, "duration": round(s.duration, 2)}
@@ -490,10 +655,11 @@ class Studio:
 
     # ----------------------------------------------------------------- voice
     def _text_in_range(self, p: Project, start: float, end: float) -> str:
+        lang = p.settings.source_language
         words = [w.text for s in p.segments for w in s.words if w.start >= start - 0.05 and w.end <= end + 0.05]
         if words:
-            return " ".join(words)
-        return " ".join(s.text for s in p.segments if s.start < end and s.end > start)
+            return languages.join_tokens(words, lang)
+        return languages.join_tokens([s.text for s in p.segments if s.start < end and s.end > start], lang)
 
     def _voice_source(self, p: Project) -> Path:
         rel = p.source.vocals or p.source.audio_hq
@@ -534,7 +700,22 @@ class Studio:
         self.publish_project(project_id)
         return self.store.get(project_id)
 
-    def upload_voice(self, project_id: str, filename: str, data: bytes, ref_text: str) -> Project:
+    def upload_voice(
+        self,
+        project_id: str,
+        filename: str,
+        data: bytes,
+        ref_text: str,
+        auto_transcribe: bool = True,
+        asr_engine: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> Project:
+        project = self._store_uploaded_voice(project_id, filename, data, ref_text, language)
+        if auto_transcribe and not ref_text.strip():
+            self.transcribe_voice_reference(project_id, asr_engine or None, language or None)
+        return project
+
+    def _store_uploaded_voice(self, project_id: str, filename: str, data: bytes, ref_text: str, language: Optional[str]) -> Project:
         refs = self.store.dir(project_id) / "refs"
         refs.mkdir(parents=True, exist_ok=True)
         raw = refs / f"upload_raw{Path(filename).suffix.lower() or '.wav'}"
@@ -543,7 +724,10 @@ class Studio:
             voices.convert_upload(raw, refs / "upload.wav")
         except Exception as exc:
             raise StudioError(f"Could not read the audio file: {exc}") from exc
-        return self.set_voice(project_id, {"mode": "upload", "ref_audio": "refs/upload.wav", "ref_text": ref_text, "upload_name": filename})
+        return self.set_voice(
+            project_id,
+            {"mode": "upload", "ref_audio": "refs/upload.wav", "ref_text": ref_text, "upload_name": filename, "ref_language": language or None, "ref_text_status": "idle"},
+        )
 
     def _voice_resolver(self, p: Project) -> Callable[[Segment], Tuple[Optional[str], Optional[str]]]:
         v = p.voice

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Captions, Clapperboard, Film, Headphones } from 'lucide-react'
 import { fileUrl } from '../api'
+import { isRtl } from './Flags'
 import { usePlayer, type PlayerMode } from '../player'
 import type { Project } from '../types'
 import { cls, fmtTime, segmentIndexAt } from '../utils'
@@ -144,7 +145,15 @@ export function VideoPlayer({ project }: { project: Project }) {
               </div>
             )}
             {seg.translation && (
-              <div className="arabic bg-accent-gradient max-w-[92%] rounded-lg px-3 py-1 text-center text-[15px] font-semibold text-on-accent shadow-[0_6px_20px_-6px_rgba(155,210,60,.7)]">{seg.translation}</div>
+              <div
+                dir="auto"
+                className={cls(
+                  'bg-accent-gradient max-w-[92%] rounded-lg px-3 py-1 text-center text-[15px] font-semibold text-on-accent shadow-[0_6px_20px_-6px_rgba(155,210,60,.7)]',
+                  isRtl(project.settings.target) && 'arabic',
+                )}
+              >
+                {seg.translation}
+              </div>
             )}
           </div>
         )}

@@ -1,0 +1,19 @@
+# Dubby 🐨 — "indic" engine family: IndicTrans2 (English→Hindi) and IndicF5 (Hindi TTS)
+# Both need transformers < 4.50. Dubby auto-detects an env named `dubby-indic`.
+#
+#   conda env create -f environment-indic.yml
+#   conda run -n dubby-indic pip install git+https://github.com/ai4bharat/IndicF5.git
+#
+# Accept the model terms on Hugging Face first (both repos are gated).
+name: dubby-indic
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - ffmpeg
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.8.0
+      - torchaudio==2.8.0
+      - -e .[indic]

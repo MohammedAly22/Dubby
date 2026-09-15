@@ -5,16 +5,13 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-StageName = Literal["download", "asr", "translation", "voice", "tts", "separation", "render"]
-STAGES: List[str] = ["download", "asr", "translation", "voice", "tts", "separation", "render"]
+from dubby import languages
+
+StageName = Literal["download", "langid", "asr", "translation", "voice", "tts", "separation", "render"]
+STAGES: List[str] = ["download", "langid", "asr", "translation", "voice", "tts", "separation", "render"]
 StageStatus = Literal["idle", "queued", "running", "done", "error", "cancelled"]
-SourceLanguage = Literal["en", "ar"]
-TargetDialect = Literal["arz", "arb"]
-
-TARGET_LABELS = {"arz": "Egyptian Arabic", "arb": "Modern Standard Arabic"}
-SOURCE_LABELS = {"en": "English", "ar": "Arabic (Egyptian / MSA)"}
 
 
 class StageState(BaseModel):
@@ -83,12 +80,14 @@ class VoiceConfig(BaseModel):
     clip_end: Optional[float] = None
     ref_audio: Optional[str] = None  # relative path of the prepared reference wav
     ref_text: str = ""
+    ref_language: Optional[str] = None  # spoken language of the reference clip
+    ref_text_status: Literal["idle", "queued", "running", "done", "error"] = "idle"
     upload_name: Optional[str] = None
 
 
 class ProjectSettings(BaseModel):
-    source_language: SourceLanguage = "en"
-    target: TargetDialect = "arz"
+    source_language: str = "en"
+    target: str = "arz"
     asr: EngineChoice = Field(default_factory=lambda: EngineChoice(engine="whisperx"))
     translation: EngineChoice = Field(default_factory=lambda: EngineChoice(engine="emhotob"))
     tts: EngineChoice = Field(default_factory=lambda: EngineChoice(engine="voicetut"))
@@ -97,6 +96,20 @@ class ProjectSettings(BaseModel):
     max_chunk_seconds: float = 12.0
     min_chunk_seconds: float = 1.2
     max_word_gap: float = 0.9
+
+    @field_validator("source_language")
+    @classmethod
+    def _valid_source(cls, v: str) -> str:
+        if v not in languages.SOURCE_CODES:
+            raise ValueError(f"unsupported spoken language '{v}' (supported: {', '.join(languages.SOURCE_CODES)})")
+        return v
+
+    @field_validator("target")
+    @classmethod
+    def _valid_target(cls, v: str) -> str:
+        if v not in languages.TARGET_CODES:
+            raise ValueError(f"unsupported dub language '{v}' (supported: {', '.join(languages.TARGET_CODES)})")
+        return v
 
 
 class SourceInfo(BaseModel):
@@ -111,6 +124,11 @@ class SourceInfo(BaseModel):
     audio_hq: Optional[str] = None
     vocals: Optional[str] = None
     background: Optional[str] = None
+    # spoken-language detection
+    auto_detect: bool = False
+    detected_language: Optional[str] = None  # raw ISO code from the detector
+    detected_probability: Optional[float] = None
+    detected_candidates: List[List[Any]] = Field(default_factory=list)
 
 
 class ExportItem(BaseModel):

@@ -61,6 +61,17 @@ qwen = [
 ]
 # NVIDIA NeMo family: Parakeet TDT.
 nemo = ["nemo_toolkit[asr]", "silero-vad>=5.1"]
+# Indic family: IndicTrans2 (English→Hindi) and IndicF5 (Hindi TTS) need transformers < 4.50.
+# IndicF5 itself is installed from GitHub: pip install git+https://github.com/ai4bharat/IndicF5.git
+indic = [
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "transformers>=4.46,<4.50",
+    "IndicTransToolkit>=1.1.1",
+    "sentencepiece",
+    "accelerate",
+    "silero-vad>=5.1",
+]
 # Optional vocal / background separation for a cleaner mix.
 separation = ["demucs>=4.0.1"]
 

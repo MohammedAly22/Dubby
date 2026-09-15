@@ -14,6 +14,7 @@ from dubby import __version__
 
 STAGE_META = {
     "download": ("⬇️ ", "Download"),
+    "langid": ("🌐", "Language detection"),
     "asr": ("🎙️ ", "Transcription"),
     "translation": ("🌍", "Translation"),
     "voice": ("🧬", "Reference voice"),
