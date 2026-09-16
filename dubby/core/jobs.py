@@ -29,6 +29,10 @@ def worker_env(settings: Settings) -> Dict[str, str]:
     env["DUBBY_DEVICE"] = settings.device
     env["PYTHONPATH"] = PACKAGE_ROOT + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
+    # Colab exports MPLBACKEND=module://matplotlib_inline.backend_inline, which only exists in its
+    # own kernel — any import chain reaching matplotlib (whisperx → pyannote → lightning → torchmetrics)
+    # would crash the worker. Workers are headless, so force a safe backend.
+    env["MPLBACKEND"] = "Agg"
     if settings.hf_token:
         env["HF_TOKEN"] = settings.hf_token
     node = settings.resolved_node()

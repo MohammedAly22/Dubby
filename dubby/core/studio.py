@@ -43,6 +43,9 @@ from dubby.schemas import (
 
 YOUTUBE_RE = re.compile(r"^(https?://)?(www\.|m\.|music\.)?(youtube\.com|youtu\.be)/", re.I)
 
+# Minimum gap between progress-only stage events (status changes are never throttled).
+PROGRESS_PUBLISH_INTERVAL = 0.2
+
 
 class StudioError(Exception):
     """A user-facing error (bad request, missing prerequisite…)."""
@@ -72,6 +75,7 @@ class Studio:
         self._engine_status: Dict[str, Any] = {}
         self._status_lock = threading.Lock()
         self._cancel_flags: Set[Tuple[str, str]] = set()
+        self._last_progress_pub: Dict[Tuple[str, str], float] = {}
         self._recover()
         threading.Thread(target=self._saver, daemon=True, name="dubby-saver").start()
         # build/start the YouTube token helper now so the first download doesn't wait for it
@@ -107,6 +111,18 @@ class Studio:
         self.bus.publish({"type": "project", "project": self.store.get(project_id).model_dump()})
 
     def set_stage(self, project_id: str, stage: str, persist: bool = True, **changes: Any) -> None:
+        # Progress ticks arrive many times a second; publishing each one floods the websocket
+        # (very noticeable through the Colab proxy). Status changes always go out immediately.
+        if "status" not in changes:
+            now = time.time()
+            key = (project_id, stage)
+            if now - self._last_progress_pub.get(key, 0.0) < PROGRESS_PUBLISH_INTERVAL:
+                with self.store.mutate(project_id, persist=persist) as p:
+                    st = p.stages.setdefault(stage, StageState())
+                    for k, v in changes.items():
+                        setattr(st, k, v)
+                return
+            self._last_progress_pub[key] = now
         with self.store.mutate(project_id, persist=persist) as p:
             st = p.stages.setdefault(stage, StageState())
             status = changes.get("status")

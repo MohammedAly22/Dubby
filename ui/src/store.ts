@@ -255,6 +255,10 @@ function handleEvent(e: any) {
   const state = useStudio.getState()
   const current = state.project
   switch (e.type) {
+    case 'batch':
+      // one frame carrying several events — React batches the renders
+      for (const inner of e.events) handleEvent(inner)
+      break
     case 'hello':
     case 'jobs':
       useStudio.setState({ jobs: e.jobs })

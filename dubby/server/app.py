@@ -81,6 +81,38 @@ def _range_response(path: Path, request: Request, download: bool) -> Any:
     return StreamingResponse(stream(), status_code=206, media_type=media_type, headers=headers)
 
 
+BATCH_WINDOW = 0.08  # seconds to gather events before sending one websocket frame
+BATCH_MAX = 250
+
+
+def collapse_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop superseded events. Each carries full state, so only the newest per target matters."""
+
+    def key(e: Dict[str, Any]) -> Optional[tuple]:
+        kind = e.get("type")
+        if kind == "project":
+            return ("project", (e.get("project") or {}).get("id"))
+        if kind == "stage":
+            return ("stage", e.get("project_id"), e.get("stage"))
+        if kind == "segment":
+            return ("segment", e.get("project_id"), (e.get("segment") or {}).get("id"))
+        if kind in ("jobs", "engines"):
+            return (kind,)
+        return None  # logs, exports, … are all kept
+
+    seen: Set[tuple] = set()
+    keep: List[Dict[str, Any]] = []
+    for e in reversed(events):
+        k = key(e)
+        if k is not None:
+            if k in seen:
+                continue
+            seen.add(k)
+        keep.append(e)
+    keep.reverse()
+    return keep
+
+
 def create_app(studio: Studio) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -290,8 +322,19 @@ def create_app(studio: Studio) -> FastAPI:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=15)
                 except asyncio.TimeoutError:
-                    event = {"type": "ping"}
-                await ws.send_json(event)
+                    await ws.send_json({"type": "ping"})
+                    continue
+                # Coalesce the burst that follows into one frame: far fewer round trips over the
+                # Colab proxy, and one React render instead of dozens.
+                batch = [event]
+                await asyncio.sleep(BATCH_WINDOW)
+                while len(batch) < BATCH_MAX:
+                    try:
+                        batch.append(queue.get_nowait())
+                    except asyncio.QueueEmpty:
+                        break
+                batch = collapse_events(batch)
+                await ws.send_json(batch[0] if len(batch) == 1 else {"type": "batch", "events": batch})
         except Exception:
             pass
         finally:

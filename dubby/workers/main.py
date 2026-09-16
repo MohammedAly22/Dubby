@@ -10,6 +10,9 @@ import time
 import traceback
 from typing import Any, Dict, Optional
 
+if os.environ.get("MPLBACKEND", "").startswith("module://"):
+    os.environ["MPLBACKEND"] = "Agg"  # e.g. Colab's matplotlib_inline backend, absent from this venv
+
 from dubby.engines.base import Engine, TTSItem
 from dubby.languages import join_tokens
 from dubby.engines.registry import engine_class
