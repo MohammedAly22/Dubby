@@ -382,7 +382,7 @@ dubby dub "URL" --source en --target arz --tts voicetut --voice preset:Mohamed -
 
 Run [`notebooks/Dubby_Colab.ipynb`](notebooks/Dubby_Colab.ipynb) cell by cell:
 
-`0 helpers` → `1 GPU` → `2 clone` → `3 Node.js 22` → `4 core venv` → `5 qwen / nemo / indic venvs` → `6 HF token` → `🍪 YouTube cookies` → `7 build UI + doctor + languages` → `🚀 launch`
+`0 helpers` → `1 GPU` → `2 clone` → `3 Node.js 22` → `4 core venv` → `5 qwen / nemo / indic venvs` → `6 HF token` → `7 build UI + doctor + languages` → `🚀 launch`
 
 * Dubby installs with **`uv` into isolated Python 3.12 venvs** under `/content/envs`, so Colab's own Python 3.13 packages never conflict with it.
 * Every install step **stops with the real error**. You never see a ✅ on a failed install, and the venv's `dubby` is added to `PATH` for later cells.
@@ -402,19 +402,16 @@ Settings live in `~/Dubby/settings.json` and can be edited in the UI. Environmen
 | `DUBBY_PYTHON_CORE` · `_QWEN` · `_NEMO` · `_INDIC` | Interpreter per engine family |
 | `HF_TOKEN` | Hugging Face token passed to workers |
 
-### 🍪 YouTube cookies ("Sign in to confirm you're not a bot")
+### ▶️ YouTube downloads on Colab & cloud machines (no sign-in)
 
-YouTube often blocks cloud and datacenter IPs (Colab, cloud VMs) with *"Sign in to confirm you're not a bot"*. The fix, [recommended by yt-dlp](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies), is to download with cookies from your own browser session:
+Cloud IPs (Colab, VMs) are often answered with *"Sign in to confirm you're not a bot"*. Dubby handles this for you, with no cookies and no account:
 
-1. Open a **private/incognito** window and sign in to YouTube.
-2. Export the **youtube.com** cookies in Netscape format (for example with the *Get cookies.txt LOCALLY* extension) as `cookies.txt`.
-3. **Close the private window** so YouTube does not rotate those cookies.
-4. Upload the file: **⚙️ Settings → YouTube cookies**, the **Upload cookies.txt** button on a failed download (it retries automatically), or the 🍪 cell in the Colab notebook.
+1. 🔐 **Automatic PO tokens.** Dubby builds and runs the [bgutil PO-token provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider), recommended in yt-dlp's [PO Token Guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide). It is built once (`dubby youtube-helper`, ~1 min — the Colab install cell does it) and then starts with the studio.
+2. 📺 **Client fallback.** If YouTube still blocks a request, Dubby retries through the TV, embedded and Safari player clients over IPv4, which YouTube scores differently.
+3. 📁 **One-drop fallback.** If every strategy is blocked, drop the video file on the Source step — the project keeps its languages and engines.
 
-Dubby validates the file, keeps it only in `DUBBY_HOME` (never in the repository) and never logs its contents. If YouTube still refuses, use **Upload the video file instead** on the Source step: the project keeps all its settings.
-
-> [!CAUTION]
-> Cookies grant access to your YouTube account, and heavy automated downloading can get an account flagged. Consider using a secondary account.
+> [!TIP]
+> Still blocked? A fresh Colab runtime usually gets a new IP. A proxy (⚙️ Settings) and a cookies file are supported but optional — cookies are only really needed for members-only or age-restricted videos.
 
 ---
 
@@ -495,8 +492,8 @@ class MyTTS(TTSEngine):
 | Dub has a foreign accent | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice |
 | Weak Hindi pronunciation | Use IndicF5 (indic family) instead of OmniVoice, which has only 117 h of Hindi |
 | Colab: `dubby: command not found` | Re-run step 4. It installs into `/content/envs/dubby` and adds it to `PATH`, and it stops with the real error if the install fails |
-| *Sign in to confirm you're not a bot* | Add YouTube cookies ([see above](#-youtube-cookies-sign-in-to-confirm-youre-not-a-bot)) and retry, or upload the video file on the Source step |
-| YouTube download fails with cookies | The cookies expired or were rotated. Export fresh ones from a private window, and update yt-dlp: `pip install -U "yt-dlp[default]"` with `node` ≥ 22 on the PATH |
+| *Sign in to confirm you're not a bot* / *blocked by YouTube* | Handled automatically ([see above](#️-youtube-downloads-on-colab--cloud-machines-no-sign-in)) — if every strategy fails, drop the video file on the Source step, or restart the Colab runtime for a new IP |
+| `youtube token helper: not built` in `dubby doctor` | Run `dubby youtube-helper --check` (needs `node` ≥ 20, `npm` and `git`), and keep tooling current: `pip install -U "yt-dlp[default]" bgutil-ytdlp-pot-provider` |
 | `Could not resolve host: github.com` | Your network is blocking GitHub's DNS. Use another network or ask your admin |
 | Dev UI shows *backend not reachable* | Start `dubby serve`, or run `dubby dev` to launch the backend and Vite together |
 | Clips sound rushed | Lower *Max speed-up*, shorten the line, or raise *Max chunk* |

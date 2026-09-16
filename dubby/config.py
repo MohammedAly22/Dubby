@@ -57,7 +57,8 @@ class Settings(BaseModel):
     # Stop workers of other families before starting one (frees GPU memory).
     exclusive_gpu: bool = True
     # yt-dlp
-    cookies_file: Optional[str] = None
+    cookies_file: Optional[str] = None  # optional; downloads work without it
+    proxy: Optional[str] = None  # optional, e.g. http://user:pass@host:port or socks5://host:port
     node_path: Optional[str] = None
     export_dir: Optional[str] = None
 

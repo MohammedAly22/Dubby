@@ -134,6 +134,15 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     tools.add_column("path")
     for name, path in (("ffmpeg", shutil.which("ffmpeg")), ("ffprobe", shutil.which("ffprobe")), ("node", settings.resolved_node()), ("npm", shutil.which("npm"))):
         tools.add_row(name, Text(path or "missing", style="green" if path else "red"))
+    from dubby.media import pot
+
+    helper = pot.server_dir(settings)
+    if pot.is_running():
+        tools.add_row("youtube token helper", Text(f"running on {pot.BASE_URL}", style="green"))
+    elif helper and (helper / "build" / "main.js").is_file():
+        tools.add_row("youtube token helper", Text("built — starts with the studio", style="green"))
+    else:
+        tools.add_row("youtube token helper", Text("not built — run `dubby youtube-helper`" if helper else f"missing: pip install {pot.PLUGIN}", style="yellow"))
     console.print(tools)
 
     families = {f: run_doctor(settings, f) for f in ENGINE_FAMILIES}
@@ -156,6 +165,32 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     console.print(table)
     if args.json:
         console.print_json(json.dumps(families))
+
+
+# -------------------------------------------------------------- youtube helper
+def cmd_youtube_helper(args: argparse.Namespace) -> None:
+    """Build (and optionally test) the PO-token helper that lets YouTube downloads work without sign-in."""
+    from dubby.media import pot
+
+    settings = load_settings()
+
+    def log(msg: str, level: str = "info") -> None:
+        console.print(Text(f"  {msg}", style="yellow" if level == "warning" else "white"))
+
+    try:
+        path = pot.ensure_built(settings, log)
+    except Exception as exc:
+        console.print(Text(f"  ❌ {exc}", style="bold red"))
+        sys.exit(1)
+    console.print(Text(f"  ✅ YouTube token helper ready → {path}", style="bold green"))
+    if args.check:
+        if not pot.ensure_running(settings, log):
+            sys.exit(1)
+        import urllib.request
+
+        with urllib.request.urlopen(f"{pot.BASE_URL}/ping", timeout=10) as res:
+            console.print(Text(f"  ✅ helper answers: {res.read().decode()[:120]}", style="bold green"))
+        pot.stop()
 
 
 # --------------------------------------------------------------------- engines
@@ -296,6 +331,10 @@ def main(argv: List[str] | None = None) -> None:
     p = sub.add_parser("doctor", help="check tools, interpreters and engines")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_doctor)
+
+    p = sub.add_parser("youtube-helper", help="build the YouTube token helper (downloads without cookies or sign-in)")
+    p.add_argument("--check", action="store_true", help="also start it once and ping it")
+    p.set_defaults(func=cmd_youtube_helper)
 
     sub.add_parser("engines", help="list engines").set_defaults(func=cmd_engines)
     sub.add_parser("languages", help="supported languages and recommended engines").set_defaults(func=cmd_languages)

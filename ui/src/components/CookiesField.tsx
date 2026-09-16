@@ -54,8 +54,8 @@ export function CookiesField({ configured, onChange, compact }: { configured: bo
       </div>
       {!compact && (
         <p className="text-xs leading-relaxed text-neutral-500">
-          Needed when YouTube says “Sign in to confirm you’re not a bot” (common on Colab). Open a private/incognito window, sign in to YouTube, export{' '}
-          <b>youtube.com</b> cookies with a “Get cookies.txt LOCALLY” extension, then close that window. Stored only on the studio machine.
+          Not required — downloads work without sign-in. Only for members-only/age-restricted videos: export <b>youtube.com</b> cookies (Netscape
+          cookies.txt) from a private window. Stored only on the studio machine.
         </p>
       )}
     </div>

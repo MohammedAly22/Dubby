@@ -29,7 +29,8 @@ dependencies = [
     "numpy>=1.26",
     "soundfile>=0.12",
     "librosa>=0.10",
-    "yt-dlp[default]>=2025.10.22",
+    "yt-dlp[default]>=2026.8.19",
+    "bgutil-ytdlp-pot-provider>=2.0.0",
     "huggingface_hub>=0.30",
 ]
 

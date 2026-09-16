@@ -36,7 +36,7 @@ export function SettingsDialog() {
         device: settings.device,
         exclusive_gpu: settings.exclusive_gpu,
         worker_python: settings.worker_python,
-        cookies_file: settings.cookies_file || null,
+        proxy: settings.proxy || null,
         node_path: settings.node_path || null,
         export_dir: settings.export_dir || null,
       }
@@ -78,7 +78,10 @@ export function SettingsDialog() {
             <Field label="Export directory" hint="Where exported videos are saved on the studio machine.">
               <input className={inputCls} placeholder={`${settings.home}/exports`} value={settings.export_dir ?? ''} onChange={(e) => set('export_dir', e.target.value)} />
             </Field>
-            <Field label="YouTube cookies" className="sm:col-span-2">
+            <Field label="Download proxy (optional)" hint="Not needed normally — YouTube downloads use automatic PO tokens. e.g. socks5://host:1080">
+              <input className={inputCls} placeholder="none" value={settings.proxy ?? ''} onChange={(e) => set('proxy', e.target.value)} />
+            </Field>
+            <Field label="YouTube cookies (optional)" className="sm:col-span-2">
               <CookiesField configured={!!settings.cookies_configured} onChange={(s) => setSettings(s)} />
             </Field>
             <Field label="Node.js path" hint={`Resolved: ${settings.node_resolved ?? 'not found'} (used by yt-dlp)`}>

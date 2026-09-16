@@ -43,7 +43,7 @@ export function SourcePanel({ project, onNext }: { project: Project; onNext: () 
         }
       />
 
-      {st?.status === 'error' && src.kind === 'youtube' && <DownloadRecovery project={project} needsCookies={/not a bot|cookies|private|members-only|age-restricted/i.test(st.error ?? '')} />}
+      {st?.status === 'error' && src.kind === 'youtube' && <DownloadRecovery project={project} />}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Info label="Title" value={src.title ?? project.title} />
@@ -119,75 +119,82 @@ export function SourcePanel({ project, onNext }: { project: Project; onNext: () 
   )
 }
 
-/** Shown when a YouTube download fails: add cookies and retry, or use an uploaded file. */
-function DownloadRecovery({ project, needsCookies }: { project: Project; needsCookies: boolean }) {
+/** Shown when a YouTube download fails: drop in the video file (instant) or retry. */
+function DownloadRecovery({ project }: { project: Project }) {
   const toast = useStudio((s) => s.toast)
   const runStage = useStudio((s) => s.runStage)
   const fileInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [advanced, setAdvanced] = useState(false)
   const [cookies, setCookies] = useState(false)
 
   useEffect(() => {
     api.getSettings().then((s) => setCookies(!!s.cookies_configured)).catch(() => {})
   }, [])
 
+  const useFile = async (file: File) => {
+    setUploading(true)
+    try {
+      await api.replaceSource(project.id, file)
+      toast(`Using ${file.name} as the source`, 'success')
+    } catch (err: any) {
+      toast(err.message, 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div className="fade-in flex flex-col gap-4 rounded-2xl border border-line-strong p-4">
-      <div className="text-sm font-semibold">How to get this video</div>
-      <div className={needsCookies ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4'}>
-        {needsCookies && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              <Cookie className="size-3.5" /> 1 · Add YouTube cookies, then retry
-            </div>
-            <CookiesField
-              configured={cookies}
-              compact
-              onChange={(s) => {
-                const ok = !!s.cookies_configured
-                setCookies(ok)
-                if (ok) runStage('download')
-              }}
-            />
-            <p className="text-xs leading-relaxed text-neutral-500">
-              In a private/incognito window sign in to YouTube, export <b>youtube.com</b> cookies as <code>cookies.txt</code> (“Get cookies.txt LOCALLY” extension), close the window, then upload the file here — the download restarts automatically.
-            </p>
-            {cookies && (
-              <Button size="sm" icon={<RotateCcw className="size-3.5" />} onClick={() => runStage('download')} className="self-start">
-                Retry with cookies
-              </Button>
-            )}
-          </div>
-        )}
-        <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => fileInput.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          const file = e.dataTransfer.files?.[0]
+          if (file) useFile(file)
+        }}
+        className={`flex flex-col items-center gap-2 rounded-2xl border border-dashed px-4 py-7 text-center transition-colors ${dragging ? 'border-leaf bg-white/[.04]' : 'border-line-strong hover:bg-white/[.03]'}`}
+      >
+        <Upload className="size-6" />
+        <span className="text-sm font-semibold">{uploading ? 'Uploading…' : 'Drop the video file here, or click to choose'}</span>
+        <span className="text-xs text-neutral-500">Fastest fix — this project keeps its languages and engines, and the pipeline continues as usual.</span>
+      </button>
+      <input ref={fileInput} type="file" accept="video/*,audio/*" hidden onChange={(e) => e.target.files?.[0] && useFile(e.target.files[0])} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" icon={<RotateCcw className="size-3.5" />} onClick={() => runStage('download')}>
+          Retry download
+        </Button>
+        <span className="text-xs text-neutral-500">Retries run every strategy again (PO tokens, TV and embedded clients). A new Colab runtime gets a new IP.</span>
+        <button type="button" className="ml-auto text-xs text-neutral-500 underline-offset-4 hover:text-neutral-200 hover:underline" onClick={() => setAdvanced((v) => !v)}>
+          {advanced ? 'Hide advanced' : 'Advanced: cookies'}
+        </button>
+      </div>
+
+      {advanced && (
+        <div className="fade-in flex flex-col gap-2 border-t border-line pt-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-            <Upload className="size-3.5" /> {needsCookies ? '2 · Or' : 'Or'} upload the video file
+            <Cookie className="size-3.5" /> Optional · YouTube cookies
           </div>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="video/*,audio/*"
-            hidden
-            onChange={async (e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              setUploading(true)
-              try {
-                await api.replaceSource(project.id, file)
-                toast(`Using ${file.name} as the source`, 'success')
-              } catch (err: any) {
-                toast(err.message, 'error')
-              } finally {
-                setUploading(false)
-              }
+          <CookiesField
+            configured={cookies}
+            onChange={(s) => {
+              const ok = !!s.cookies_configured
+              setCookies(ok)
+              if (ok) runStage('download')
             }}
           />
-          <Button icon={<Upload className="size-4" />} loading={uploading} onClick={() => fileInput.current?.click()} className="self-start">
-            Choose a video file
-          </Button>
-          <p className="text-xs text-neutral-500">Keeps this project and its settings; the rest of the pipeline works exactly the same.</p>
+          <p className="text-xs text-neutral-500">A proxy can also be set in ⚙️ Settings. Neither is needed for most videos.</p>
         </div>
-      </div>
+      )}
     </div>
   )
 }

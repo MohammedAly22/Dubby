@@ -24,7 +24,7 @@ from dubby.core.events import EventBus
 from dubby.core.jobs import Job, JobHandlers, JobManager, run_doctor
 from dubby.core.storage import ProjectStore
 from dubby.engines.registry import all_infos, get_info
-from dubby.media import ffmpeg, youtube
+from dubby.media import ffmpeg, pot, youtube
 from dubby.pipeline.chunking import fill_word_times, split_segment_words
 from dubby.pipeline.render import render_project
 from dubby.schemas import (
@@ -74,6 +74,8 @@ class Studio:
         self._cancel_flags: Set[Tuple[str, str]] = set()
         self._recover()
         threading.Thread(target=self._saver, daemon=True, name="dubby-saver").start()
+        # build/start the YouTube token helper now so the first download doesn't wait for it
+        pot.warm_up(self.settings, lambda msg, level="info": self.bus.log(msg, level, source="youtube"))
 
     # ================================================================ plumbing
     def _saver(self) -> None:
@@ -318,7 +320,10 @@ class Studio:
 
             meta: Dict[str, Any] = {}
             if p.source.kind == "youtube":
-                meta = youtube.download(p.source.url or "", src_dir, self.settings, progress)
+                meta = youtube.download(
+                    p.source.url or "", src_dir, self.settings, progress,
+                    log=lambda msg, level="info": self.bus.log(msg, level, project_id, source="download"),
+                )
                 video = Path(meta["video"])
             else:
                 video = self.store.path(project_id, p.source.video or "")
@@ -355,7 +360,7 @@ class Studio:
         except youtube.YouTubeAccessError as exc:
             # expected, actionable failure: no traceback, just the explanation
             self.bus.log(str(exc), "warning", project_id, source="download")
-            self.set_stage(project_id, stage, status="error", error=str(exc), message="Needs cookies or a file upload" if exc.needs_cookies else "Failed")
+            self.set_stage(project_id, stage, status="error", error=str(exc), message="Blocked by YouTube — upload the file" if exc.blocked else "Failed")
         except Exception as exc:
             self.bus.log(traceback.format_exc(), "error", project_id, source="download")
             self.set_stage(project_id, stage, status="error", error=str(exc), message="Failed")
@@ -1019,4 +1024,5 @@ class Studio:
     def shutdown(self) -> None:
         self.store.flush_dirty()
         self.jobs.shutdown()
+        pot.stop()
         self.pool.shutdown(wait=False, cancel_futures=True)
