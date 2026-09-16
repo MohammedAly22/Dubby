@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple  # 
 
 from pydantic import ValidationError
 
-from dubby import languages, recommend
+from dubby import hardware, languages, recommend
 from dubby.config import ENGINE_FAMILIES, Settings, load_settings, save_settings
 from dubby.core import voices
 from dubby.core.events import EventBus
@@ -155,7 +155,27 @@ class Studio:
             info = get_info(current.engine)
             current.params = {**info.defaults(), **current.params}
             setattr(p.settings, stage, current)
-            return current.model_copy(deep=True)
+            choice = current.model_copy(deep=True)
+        self._ensure_fits(choice.engine, choice.params)
+        return choice
+
+    def _gpu(self) -> Optional[hardware.GPU]:
+        with self._status_lock:
+            status = self._engine_status
+        return hardware.from_status(status)
+
+    def _ensure_fits(self, engine_id: str, params: Dict[str, Any]) -> None:
+        """Refuse to queue a model that cannot fit the GPU (the worker double-checks)."""
+        verdict = hardware.check(engine_id, params, self._gpu())
+        if not verdict["fits"]:
+            raise StudioError(" ".join(filter(None, [verdict["message"], verdict["suggestion"]])))
+
+    def check_engine(self, engine_id: str, params: Optional[Dict[str, Any]], source: Optional[str] = None, target: Optional[str] = None) -> Dict[str, Any]:
+        try:
+            get_info(engine_id)
+        except KeyError as exc:
+            raise StudioError(str(exc).strip("'\"")) from None
+        return hardware.check(engine_id, params, self._gpu(), source, target)
 
     def _require_available(self, engine_id: str) -> None:
         status = self.engine_status()
@@ -180,6 +200,7 @@ class Studio:
 
     def engines(self, refresh: bool = False) -> Dict[str, Any]:
         status = self.engine_status(refresh)
+        gpu = hardware.from_status(status)
         infos = []
         for info in all_infos():
             d = info.to_dict()
@@ -188,8 +209,12 @@ class Studio:
             d["available"] = bool(entry and entry.get("available"))
             d["missing"] = entry.get("missing", []) if entry else info.requires
             d["family_error"] = fam.get("error")
+            try:
+                d.update(hardware.minimum_vram(info.id, gpu))
+            except Exception:  # a buggy estimate must never hide the engine list
+                d.update(vram_min_gb=None, vram_default_gb=None, fits_any=True)
             infos.append(d)
-        return {"engines": infos, "families": status}
+        return {"engines": infos, "families": status, "gpu": gpu.to_dict() if gpu else None}
 
     def system(self) -> Dict[str, Any]:
         status = self.engine_status()

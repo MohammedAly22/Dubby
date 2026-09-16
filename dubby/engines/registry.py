@@ -25,6 +25,7 @@ ENGINES: Dict[str, str] = {
     "hunyuan-mt": "dubby.engines.translation.hunyuan:HunyuanMTTranslator",
     "nllb": "dubby.engines.translation.nllb:NLLBTranslator",
     "indictrans2": "dubby.engines.translation.indictrans2:IndicTrans2Translator",
+    "arzen-llm": "dubby.engines.translation.arzen:ArzEnTranslator",
     "llm": "dubby.engines.translation.llm:LLMTranslator",
     "passthrough": "dubby.engines.translation.passthrough:PassthroughTranslator",
     # ---------------------------------------------------------------- TTS

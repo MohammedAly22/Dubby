@@ -97,7 +97,7 @@ export function TranslatePanel({ project, onNext }: { project: Project; onNext: 
 
 const TranslationRow = memo(function TranslationRow({ seg, index, rtl }: { seg: Segment; index: number; rtl: boolean }) {
   const updateSegment = useStudio((s) => s.updateSegment)
-  const runStage = useStudio((s) => s.runStage)
+  const retranslateLine = useStudio((s) => s.retranslateLine)
   const select = useStudio((s) => s.select)
   const selected = useStudio((s) => s.selectedId === seg.id)
   const playRange = usePlayer((s) => s.playRange)
@@ -129,7 +129,7 @@ const TranslationRow = memo(function TranslationRow({ seg, index, rtl }: { seg: 
               </span>
             )}
           </span>
-          <IconButton title="Retranslate this segment" disabled={working} onClick={() => runStage('translation', { segment_ids: [seg.id] })} className="size-6 opacity-50 group-hover:opacity-100">
+          <IconButton title="Retranslate this segment" disabled={working} onClick={() => retranslateLine(seg.id)} className="size-6 opacity-50 group-hover:opacity-100">
             <RefreshCw className="size-3" />
           </IconButton>
         </div>

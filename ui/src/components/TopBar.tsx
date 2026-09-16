@@ -1,4 +1,4 @@
-import { Loader2, Settings, SquareTerminal } from 'lucide-react'
+import { CloudDownload, Loader2, Settings, SquareTerminal } from 'lucide-react'
 import { useStudio } from '../store'
 import { cls } from '../utils'
 import { ThemeToggle } from './ThemeToggle'
@@ -12,6 +12,10 @@ export function TopBar() {
   const setLogsOpen = useStudio((s) => s.setLogsOpen)
   const setSettingsOpen = useStudio((s) => s.setSettingsOpen)
   const errors = useStudio((s) => s.logs.filter((l) => l.level === 'error').length)
+  const downloads = useStudio((s) => s.downloads)
+  const active = Object.values(downloads).filter((d) => !d.done)
+  const bytes = active.reduce((acc, d) => (d.total ? { got: acc.got + d.downloaded, total: acc.total + d.total } : acc), { got: 0, total: 0 })
+  const pct = bytes.total ? Math.min(100, Math.floor((bytes.got / bytes.total) * 100)) : null
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-black/75 backdrop-blur-xl">
@@ -25,6 +29,23 @@ export function TopBar() {
         </a>
 
         <div className="flex items-center gap-2">
+          {active.length > 0 && (
+            <button
+              onClick={() => setLogsOpen(true)}
+              title={`Downloading ${active.map((d) => d.name).join(', ')} — open the logs for details`}
+              className="fade-in hidden items-center gap-2 rounded-full border border-line-strong px-3 py-1 text-xs text-neutral-300 transition hover:border-neutral-500 hover:text-white sm:flex"
+            >
+              <CloudDownload className="size-3.5 animate-pulse" />
+              Downloading model{pct !== null ? ` ${pct}%` : '…'}
+              <span className="relative h-1 w-14 overflow-hidden rounded-full bg-white/15">
+                {pct === null ? (
+                  <span className="shimmer absolute inset-0" />
+                ) : (
+                  <span className="bg-accent-gradient absolute inset-y-0 left-0 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+                )}
+              </span>
+            </button>
+          )}
           {jobs?.current && (
             <div className="hidden items-center gap-2 rounded-full border border-line-strong px-3 py-1 text-xs text-neutral-300 md:flex">
               <Loader2 className="size-3.5 animate-spin" />

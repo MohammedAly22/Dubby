@@ -17,7 +17,7 @@
   <a href="https://colab.research.google.com/github/MohammedAly22/Dubby/blob/main/notebooks/Dubby_Colab.ipynb"><img src="https://img.shields.io/badge/Open%20in-Colab-F4E03A?style=for-the-badge&logo=googlecolab&logoColor=black&labelColor=9BD23C" alt="Open in Colab" /></a>
   <a href="#-installation"><img src="https://img.shields.io/badge/Run-Locally-9BD23C?style=for-the-badge&logo=anaconda&logoColor=white&labelColor=1a1f14" alt="Run locally" /></a>
   <a href="#-languages--recommended-engines"><img src="https://img.shields.io/badge/Languages-9-F4E03A?style=for-the-badge&logo=googletranslate&logoColor=black&labelColor=1a1f14" alt="9 languages" /></a>
-  <a href="#-engines"><img src="https://img.shields.io/badge/Engines-23-9BD23C?style=for-the-badge&logo=huggingface&logoColor=black&labelColor=1a1f14" alt="23 engines" /></a>
+  <a href="#-engines"><img src="https://img.shields.io/badge/Engines-24-9BD23C?style=for-the-badge&logo=huggingface&logoColor=black&labelColor=1a1f14" alt="24 engines" /></a>
 </p>
 
 <p>
@@ -79,6 +79,7 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
 | English/Arabic → <img src="assets/egypt.jpg" width="16" /> Egyptian | **Emhotob-50M** › Masrawy › Jisr › LLM › NLLB | Purpose-built Egyptian translators by oddadmix |
 | English/Arabic → <img src="assets/KSA.jpg" width="16" /> MSA | **Emhotob-50M** › Hunyuan-MT › Jisr › NLLB › LLM | Emhotob scores BLEU 46 on En→MSA |
 | English → <img src="assets/India.png" width="16" /> Hindi | **IndicTrans2** › Hunyuan-MT › NLLB › LLM | AI4Bharat's state-of-the-art English→Indic model |
+| <img src="assets/egypt.jpg" width="16" /> Egyptian Arabic → <img src="assets/USA.jpg" width="16" /> English | **ArzEn-LLM** › LLM (4-bit) › NLLB (`arz_Arab`) › Hunyuan-MT | Llama-3-8B fine-tuned on code-switched Egyptian speech (BLEU 53.6); all four fit a 16 GB T4 |
 | Any → <img src="assets/Spain.png" width="16" /> <img src="assets/France.png" width="16" /> <img src="assets/Italy.png" width="16" /> <img src="assets/USA.jpg" width="16" /> | **Hunyuan-MT-7B** › LLM › NLLB | Hunyuan-MT won 30 of 31 WMT25 language pairs |
 | Any → <img src="assets/China.jpg" width="16" /> <img src="assets/Japan.png" width="16" /> | **Hunyuan-MT-7B** › Qwen LLM › NLLB | Official Chinese prompt template; Qwen is also excellent for CJK |
 | Same language (e.g. en → en) | **Keep original text** | Re-voice a video without translating |
@@ -198,6 +199,20 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
       Every project, stage, edit and clip is saved to disk, so an interrupted studio resumes where it left off.
     </td>
   </tr>
+  <tr>
+    <td valign="top">
+      <h4>🖥️ Fits your GPU</h4>
+      Dubby detects the GPU and greys out models that can't fit it, with the reason and a one-click fix. It refuses a load before it can run out of memory, and loads 7B–12B translators in 4-bit on a 16 GB T4.
+    </td>
+    <td valign="top">
+      <h4>⬇️ Live downloads & notifications</h4>
+      Model weights download with progress bars, speed and ETA in the logs. A notification appears when each stage finishes, and regenerated clips play automatically.
+    </td>
+    <td valign="top">
+      <h4>🩺 Errors you can act on</h4>
+      Out-of-memory, gated models, missing packages and network failures come back as a plain message with the next step. A crashed view recovers without losing your project.
+    </td>
+  </tr>
 </table>
 
 ---
@@ -247,13 +262,17 @@ flowchart LR
 
 | Engine | ID | Family | Directions | Highlights |
 | :-- | :-- | :-: | :-- | :-- |
-| **Tencent Hunyuan-MT-7B** | `hunyuan-mt` | core | any → en es fr it hi zh ja arb | [WMT25 winner](https://huggingface.co/tencent/Hunyuan-MT-7B), official prompt templates |
-| **Meta NLLB-200** | `nllb` | core | any → all 9 (incl. `arz_Arab`) | [600M / 1.3B / 3.3B](https://huggingface.co/facebook/nllb-200-distilled-1.3B), fast batched |
+| **ArzEn-LLM** | `arzen-llm` | core | ar (Egyptian) → en | [Llama-3-8B DoRA](https://huggingface.co/ahmedheakl/arazn-llama3-english) for code-switched Egyptian speech ([paper](https://arxiv.org/abs/2406.18120)), 4-bit on a T4 |
+| **Tencent Hunyuan-MT-7B** | `hunyuan-mt` | core | any → en es fr it hi zh ja arb | [WMT25 winner](https://huggingface.co/tencent/Hunyuan-MT-7B), official prompts; auto 4-bit on 16 GB GPUs |
+| **Meta NLLB-200** | `nllb` | core | any → all 9 (incl. `arz_Arab`) | [600M / 1.3B / 3.3B](https://huggingface.co/facebook/nllb-200-distilled-1.3B), fast batched, reads Egyptian (`arz_Arab`) input |
 | **AI4Bharat IndicTrans2** | `indictrans2` | indic | en → hi | [SOTA English→Indic](https://huggingface.co/ai4bharat/indictrans2-en-indic-1B) · 🔒 |
 | **oddadmix Emhotob-50M** | `emhotob` | core | en/ar → arz · arb | [Egyptian](https://huggingface.co/oddadmix/50M-Egyptian-Translation-v1) · [MSA](https://huggingface.co/oddadmix/50M-English-MSA-v1) · [MSA↔Egyptian](https://huggingface.co/oddadmix/50M-MSA-Egyptian-v1) |
 | **oddadmix Masrawy v2** | `masrawy` | core | en → arz | [chrF 66.7](https://huggingface.co/oddadmix/masrawy-english-arabic-translator-v2) |
 | **oddadmix Jisr-MT-50M** | `jisr` | core | en → arz · arb | [Multi-dialect Marian](https://huggingface.co/oddadmix/Jisr-MT-50M-AllDialects) |
-| **Instruct LLM** | `llm` | core | any → any | Qwen3 instruct with context from previous lines and a spoken-length target |
+| **Instruct LLM** | `llm` | core | any → any | [unsloth 4-bit](https://huggingface.co/unsloth) Qwen3 / Qwen2.5 / Llama 3.1 / Gemma 3 (or any chat model), batched, context-aware; **editable system prompt, temperature and top-p**; keeps code-switched terms for the TTS |
+
+> [!TIP]
+> **Translating on a 16 GB T4 (free Colab).** Engines and options that can't fit your GPU are greyed out with the reason, and *Apply fix* switches to a configuration that fits. Large translators load in 4-bit automatically (*Quantization → Auto*). The LLM prompt is a template: `{source}`, `{target}`, `{style}` and `{code_switching}` are filled in for each language pair, and *Preview* shows the result.
 | **Keep original text** | `passthrough` | core | same language | Re-voice without translating |
 
 ### 🔊 Text-to-speech
@@ -273,7 +292,7 @@ flowchart LR
 
 ## 🚀 Installation
 
-**Prerequisites:** 🐍 [Miniconda](https://docs.conda.io/en/latest/miniconda.html) · 🎮 an NVIDIA GPU (a T4 16 GB runs every family, one at a time; Hunyuan-MT-7B is best on L4/A100) · 🔑 a [Hugging Face token](https://huggingface.co/settings/tokens) for gated models
+**Prerequisites:** 🐍 [Miniconda](https://docs.conda.io/en/latest/miniconda.html) · 🎮 an NVIDIA GPU (a T4 16 GB runs every family, one at a time, with 7B+ translators in 4-bit; L4/A100 run them in 16-bit) · 🔑 a [Hugging Face token](https://huggingface.co/settings/tokens) for gated models
 
 ### One-command setup
 
@@ -486,7 +505,10 @@ class MyTTS(TTSEngine):
 | Symptom | Fix |
 | :-- | :-- |
 | Engine shows **not installed** | `dubby doctor` prints the exact `pip install …` for the right family interpreter |
-| **Worker exited unexpectedly** | Usually out of GPU memory. Lower batch sizes, pick a smaller checkpoint (NLLB 600M, Qwen3-ASR 0.6B), or keep *exclusive GPU* on |
+| **CUDA out of memory** | Set *Quantization* to *Auto* or 4-bit, lower the batch size, or pick a smaller checkpoint. Dubby frees the failed model's memory, so the next run starts clean |
+| Engine card greyed out: *needs 18 GB* | It can't fit the detected GPU in any configuration. Pick another engine, or run on a bigger GPU (L4 / A100) |
+| **Worker exited unexpectedly** | Usually out of system RAM (code -9) or GPU memory. Use 4-bit or a smaller checkpoint (NLLB 600M, Qwen3-ASR 0.6B), and keep *exclusive GPU* on |
+| Model download seems stuck | Open **Logs**: each file shows a progress bar with speed and ETA. Hugging Face xet downloads also show a short *reconstructing* phase |
 | 401/403 on Cohere, IndicF5 or IndicTrans2 | Accept the model terms on Hugging Face and add your token in Settings |
 | Wrong spoken language detected | Pick it manually in the Source step. The engines re-pick automatically |
 | Dub has a foreign accent | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice |
@@ -498,6 +520,16 @@ class MyTTS(TTSEngine):
 | Dev UI shows *backend not reachable* | Start `dubby serve`, or run `dubby dev` to launch the backend and Vite together |
 | Clips sound rushed | Lower *Max speed-up*, shorten the line, or raise *Max chunk* |
 | Mispronounced names | Rephrase the line (for Arabic, add tashkeel with the diacritics bar) and regenerate it |
+
+---
+
+## 🤝 Contributing
+
+New models, languages and dialects are very welcome. **[CONTRIBUTING.md](CONTRIBUTING.md)** walks through each one with copy-paste code:
+
+- **Add a model:** one engine class plus a registry line. It appears in the studio with its parameters, VRAM checks and install hints.
+- **Add an engine family:** its own venv for models with conflicting dependencies (`environment-<family>.yml`, a pyproject extra, a setup flag and a Colab checkbox).
+- **Add a language or dialect:** `languages.py`, `recommend.py` and one entry in the UI flags.
 
 ---
 
@@ -515,6 +547,9 @@ Dubby builds on these open-source projects:
 [QwenCleo-ASR](https://github.com/MohammedAly22/qwencleo-asr) ·
 [Metro-ASR](https://github.com/MohammedAly22/metro-asr) ·
 [Hunyuan-MT](https://huggingface.co/tencent/Hunyuan-MT-7B) ·
+[ArzEn-LLM](https://huggingface.co/ahmedheakl/arazn-llama3-english) ·
+[unsloth](https://github.com/unslothai/unsloth) ·
+[bitsandbytes](https://github.com/bitsandbytes-foundation/bitsandbytes) ·
 [NLLB-200](https://huggingface.co/facebook/nllb-200-distilled-1.3B) ·
 [IndicTrans2](https://github.com/AI4Bharat/IndicTrans2) ·
 [IndicF5](https://github.com/AI4Bharat/IndicF5) ·

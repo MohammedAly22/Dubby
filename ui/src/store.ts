@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { api, wsUrl, type RunBody } from './api'
-import type { AsrPreviewSegment, EngineChoice, EngineInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, Segment } from './types'
+import { api, fileUrl, wsUrl, type RunBody } from './api'
+import { playPreview } from './player'
+import type { AsrPreviewSegment, DownloadEvent, EngineChoice, EngineInfo, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, Segment } from './types'
 import { debounceByKey } from './utils'
 
 export interface Toast {
@@ -43,6 +44,10 @@ interface StudioState {
   logsOpen: boolean
   settingsOpen: boolean
   confirmRequest: ConfirmRequest | null
+  /** in-flight (and just-finished) model downloads, by id */
+  downloads: Record<string, DownloadEvent>
+  /** GPU seen by the engine doctor (null until known) */
+  gpu: GpuInfo | null
 
   connect: () => void
   loadProjects: (silent?: boolean) => Promise<void>
@@ -53,6 +58,10 @@ interface StudioState {
   dismiss: (id: number) => void
   confirm: (options: ConfirmOptions) => Promise<boolean>
   resolveConfirm: (ok: boolean) => void
+  /** regenerate one clip, then play it and notify when it lands */
+  regenerateClip: (sid: string) => Promise<void>
+  /** retranslate one line and notify when it lands */
+  retranslateLine: (sid: string) => Promise<void>
   select: (id: string | null) => void
   setClipDraft: (draft: Partial<{ start: number | null; end: number | null }>) => void
   setLogsOpen: (open: boolean) => void
@@ -60,7 +69,7 @@ interface StudioState {
 
   patchSettings: (patch: Record<string, unknown>) => void
   saveChoice: (stage: 'asr' | 'translation' | 'tts', choice: EngineChoice) => void
-  runStage: (stage: string, body?: RunBody) => Promise<void>
+  runStage: (stage: string, body?: RunBody) => Promise<boolean>
   cancelStage: (stage: string) => Promise<void>
   updateSegment: (sid: string, patch: Partial<Pick<Segment, 'text' | 'translation' | 'start' | 'end'>>) => Promise<void>
 }
@@ -124,6 +133,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   logs: [],
   toasts: [],
   confirmRequest: null,
+  downloads: {},
+  gpu: null,
   asrPreview: null,
   selectedId: null,
   clipDraft: { start: null, end: null },
@@ -175,7 +186,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     set({ enginesLoading: true })
     try {
       const data = await api.engines(refresh)
-      set({ engines: data.engines, families: data.families })
+      set({ engines: data.engines, families: data.families, gpu: data.gpu ?? null })
     } catch (e: any) {
       get().toast(`Engines: ${e.message}`, 'error')
     } finally {
@@ -217,12 +228,30 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   runStage: async (stage, body = {}) => {
     const p = get().project
-    if (!p) return
+    if (!p) return false
     try {
       await api.run(p.id, stage, body)
+      return true
     } catch (e: any) {
       get().toast(e.message, 'error')
+      return false
     }
+  },
+
+  regenerateClip: async (sid) => {
+    const p = get().project
+    if (!p) return
+    const key = `${p.id}:${sid}`
+    pendingClips.set(key, Date.now())
+    if (!(await get().runStage('tts', { segment_ids: [sid] }))) pendingClips.delete(key)
+  },
+
+  retranslateLine: async (sid) => {
+    const p = get().project
+    if (!p) return
+    const key = `${p.id}:${sid}`
+    pendingLines.set(key, Date.now())
+    if (!(await get().runStage('translation', { segment_ids: [sid] }))) pendingLines.delete(key)
   },
 
   cancelStage: async (stage) => {
@@ -281,6 +310,104 @@ function refreshListSoon() {
   }, 800)
 }
 
+// ------------------------------------------------------------- notifications
+/** single-clip regenerations / single-line retranslations awaiting their result (`${project}:${segment}`) */
+const pendingClips = new Map<string, number>()
+const pendingLines = new Map<string, number>()
+/** last status seen per `${project}:${stage}`, so each transition notifies once */
+const stageSeen = new Map<string, string>()
+const downloadTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+const STAGE_DONE: Record<string, string> = {
+  download: '⬇️ Video ready',
+  langid: '🌍 Spoken language detected',
+  asr: '🎙️ Transcription complete',
+  translation: '🌍 Translation complete',
+  voice: '🗣️ Reference voice transcribed',
+  tts: '🔊 All clips generated',
+  separation: '🎚️ Vocals and background separated',
+  render: '🎬 Dub rendered',
+}
+const STAGE_LABEL: Record<string, string> = {
+  download: 'Download',
+  langid: 'Language detection',
+  asr: 'Transcription',
+  translation: 'Translation',
+  voice: 'Reference voice',
+  tts: 'Voice generation',
+  separation: 'Separation',
+  render: 'Rendering',
+}
+
+const forProject = (map: Map<string, number>, projectId: string) => [...map.keys()].filter((k) => k.startsWith(`${projectId}:`))
+
+function notifyStage(e: any, previous: string | undefined) {
+  const status: string = e.state.status
+  if (previous === status || (status !== 'done' && status !== 'error' && status !== 'cancelled')) return
+  const pendingMap = e.stage === 'tts' ? pendingClips : e.stage === 'translation' ? pendingLines : null
+  const pending = pendingMap ? forProject(pendingMap, e.project_id) : []
+  if (status === 'cancelled') {
+    pending.forEach((k) => pendingMap!.delete(k))
+    return
+  }
+  const s = useStudio.getState()
+  const title = s.project?.id === e.project_id ? null : s.projects.find((p) => p.id === e.project_id)?.title
+  const where = title ? ` · ${title}` : ''
+  if (status === 'done') {
+    if (pending.length) return // the clip / line gets its own, more specific notification
+    s.toast(`${STAGE_DONE[e.stage] ?? `${e.stage} finished`}${e.state.message ? ` — ${e.state.message}` : ''}${where}`, 'success')
+  } else {
+    pending.forEach((k) => pendingMap!.delete(k))
+    s.toast(`${STAGE_LABEL[e.stage] ?? e.stage} failed${where}: ${e.state.error || e.state.message || 'unknown error'}`, 'error')
+  }
+}
+
+function notifySegment(e: any) {
+  const key = `${e.project_id}:${e.segment.id}`
+  const s = useStudio.getState()
+  const index = s.project && s.project.id === e.project_id ? s.project.segments.findIndex((x) => x.id === e.segment.id) : -1
+  const label = index >= 0 ? `#${index + 1}` : ''
+  if (pendingClips.has(key)) {
+    const tts = e.segment.tts
+    if (tts.status === 'done' && tts.audio) {
+      pendingClips.delete(key)
+      s.toast(`🔊 Clip ${label} generated — playing it now`, 'success')
+      playPreview(fileUrl(e.project_id, tts.audio, tts.version))
+    } else if (tts.status === 'error') {
+      pendingClips.delete(key)
+      s.toast(`Clip ${label} failed: ${tts.error ?? 'unknown error'}`, 'error')
+    }
+  }
+  if (pendingLines.has(key)) {
+    if (e.segment.translation_status === 'done') {
+      pendingLines.delete(key)
+      s.toast(`🌍 Line ${label} retranslated`, 'success')
+    } else if (e.segment.translation_status === 'error') {
+      pendingLines.delete(key)
+      s.toast(`Line ${label} failed: ${e.segment.translation_error ?? 'unknown error'}`, 'error')
+    }
+  }
+}
+
+function handleDownload(d: DownloadEvent) {
+  const timer = downloadTimers.get(d.id)
+  if (timer) clearTimeout(timer)
+  useStudio.setState((s) => ({ downloads: { ...s.downloads, [d.id]: d } }))
+  if (d.done) {
+    // keep finished rows visible briefly so people see them complete
+    downloadTimers.set(
+      d.id,
+      setTimeout(() => {
+        downloadTimers.delete(d.id)
+        useStudio.setState((s) => {
+          const { [d.id]: _gone, ...rest } = s.downloads
+          return { downloads: rest }
+        })
+      }, 4000),
+    )
+  }
+}
+
 function handleEvent(e: any) {
   const state = useStudio.getState()
   const current = state.project
@@ -290,8 +417,13 @@ function handleEvent(e: any) {
       for (const inner of e.events) handleEvent(inner)
       break
     case 'hello':
+      useStudio.setState({ jobs: e.jobs, downloads: Object.fromEntries(((e.downloads ?? []) as DownloadEvent[]).map((d) => [d.id, d])) })
+      break
     case 'jobs':
       useStudio.setState({ jobs: e.jobs })
+      break
+    case 'download':
+      handleDownload(e)
       break
     case 'project':
       if (current && e.project.id === current.id) useStudio.setState({ project: e.project })
@@ -300,12 +432,17 @@ function handleEvent(e: any) {
     case 'project_deleted':
       useStudio.setState((s) => ({ projects: s.projects.filter((p) => p.id !== e.project_id) }))
       break
-    case 'stage':
+    case 'stage': {
+      const key = `${e.project_id}:${e.stage}`
+      const previous = stageSeen.get(key) ?? (current && e.project_id === current.id ? current.stages[e.stage]?.status : undefined)
+      stageSeen.set(key, e.state.status)
       if (current && e.project_id === current.id) {
         useStudio.setState({ project: { ...current, stages: { ...current.stages, [e.stage]: e.state } } })
       }
+      notifyStage(e, previous)
       if (e.state.status === 'done' || e.state.status === 'error') refreshListSoon()
       break
+    }
     case 'segment':
       if (current && e.project_id === current.id) {
         const segments = current.segments.slice()
@@ -315,6 +452,7 @@ function handleEvent(e: any) {
           useStudio.setState({ project: { ...current, segments } })
         }
       }
+      notifySegment(e)
       break
     case 'segments':
       if (e.partial) {

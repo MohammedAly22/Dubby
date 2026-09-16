@@ -42,6 +42,8 @@ core = [
     "torchaudio==2.8.0",
     "transformers>=5.4.0",
     "accelerate",
+    "bitsandbytes>=0.45",  # 4/8-bit models on 16 GB GPUs
+    "peft>=0.13",  # adapters (ArzEn-LLM)
     "sentencepiece",
     "protobuf",
     "omnivoice>=0.2.1",

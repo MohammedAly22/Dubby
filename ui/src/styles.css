@@ -134,6 +134,12 @@ input:disabled,
   cursor: not-allowed;
 }
 
+/* Timeline scrubbing: the grabbing hand wins everywhere until the pointer is released. */
+body.scrubbing,
+body.scrubbing * {
+  cursor: grabbing !important;
+}
+
 :where(button, a[href], [role='tab'], [role='switch'], [role='option'], summary):focus-visible {
   outline: 2px solid var(--color-leaf);
   outline-offset: 2px;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import os
 import sys
@@ -13,10 +14,12 @@ from typing import Any, Dict, Optional
 if os.environ.get("MPLBACKEND", "").startswith("module://"):
     os.environ["MPLBACKEND"] = "Agg"  # e.g. Colab's matplotlib_inline backend, absent from this venv
 
+from dubby import errors, hardware
 from dubby.engines.base import Engine, TTSItem
-from dubby.languages import join_tokens
 from dubby.engines.registry import engine_class
+from dubby.languages import join_tokens
 from dubby.pipeline.chunking import build_chunks
+from dubby.workers import progress
 from dubby.workers.protocol import Channel, TaskContext
 
 
@@ -32,6 +35,18 @@ def detect_device() -> str:
         return "cpu"
 
 
+def free_gpu_memory() -> None:
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+    except Exception:
+        pass
+
+
 class Worker:
     def __init__(self, family: str, channel: Channel):
         self.family = family
@@ -39,8 +54,20 @@ class Worker:
         self.device = detect_device()
         self.engine: Optional[Engine] = None
         self.engine_key: Optional[tuple] = None
+        self.task_id: Optional[str] = None
+        # model downloads show up as progress bars in the studio instead of stderr noise
+        progress.install(channel.send, lambda: self.task_id)
 
     # ----------------------------------------------------------------- engines
+    def release_engine(self) -> None:
+        if self.engine is not None:
+            try:
+                self.engine.unload()
+            except Exception:
+                pass
+        self.engine, self.engine_key = None, None
+        free_gpu_memory()
+
     def engine_for(self, engine_id: str, params: Dict[str, Any], ctx: TaskContext) -> Engine:
         cls = engine_class(engine_id)
         key = cls.load_key(params)
@@ -49,11 +76,27 @@ class Worker:
             return self.engine
         if self.engine is not None:
             ctx.log(f"Unloading {self.engine.info.name}")
-            self.engine.unload()
-            self.engine = None
+            self.release_engine()
+
+        # Refuse up front when the model cannot fit: a failed half-load leaves VRAM behind.
+        gpu = hardware.current() if str(self.device).startswith("cuda") else hardware.GPU(False)
+        verdict = hardware.check(engine_id, params, gpu)
+        if not verdict["fits"]:
+            raise errors.InsufficientVRAM(" ".join(filter(None, [verdict["message"], verdict["suggestion"]])))
+
         engine = cls(self.device, params)
         started = time.time()
-        engine.load(ctx)
+        try:
+            engine.load(ctx)
+        except BaseException:
+            # free whatever was allocated before the failure so the next engine gets a clean GPU
+            try:
+                engine.unload()
+            except Exception:
+                pass
+            del engine
+            free_gpu_memory()
+            raise
         ctx.log(f"{cls.info.name} ready on {self.device} in {time.time() - started:.1f}s")
         self.engine, self.engine_key = engine, key
         return engine
@@ -109,6 +152,23 @@ class Worker:
 
         raise ValueError(f"Unknown task kind: {kind}")
 
+    def fail(self, task_id: str, exc: BaseException) -> None:
+        info = errors.explain(exc, self.family)
+        if info.kind in ("oom", "cuda_fatal", "numeric"):
+            # the engine's state (KV caches, half-finished tensors) can't be trusted: start clean next time
+            self.release_engine()
+        else:
+            free_gpu_memory()
+        self.channel.send({
+            "type": "error",
+            "task": task_id,
+            "error": info.message,
+            "hint": info.hint,
+            "kind": info.kind,
+            "raw": f"{type(exc).__name__}: {exc}"[:2000],
+            "traceback": traceback.format_exc(),
+        })
+
     def serve(self) -> None:
         self.channel.send({"type": "ready", "family": self.family, "python": sys.executable, "device": self.device, "pid": os.getpid()})
         for line in sys.stdin:
@@ -123,11 +183,19 @@ class Worker:
                 break
             if msg.get("type") != "task":
                 continue
+            self.task_id = msg.get("id")
             try:
                 data = self.run(msg)
                 self.channel.send({"type": "done", "task": msg["id"], "data": data})
-            except Exception as exc:  # report and keep serving
-                self.channel.send({"type": "error", "task": msg["id"], "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()})
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except BaseException as exc:  # report and keep serving
+                try:
+                    self.fail(msg["id"], exc)
+                except Exception:
+                    self.channel.send({"type": "error", "task": msg["id"], "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()})
+            finally:
+                self.task_id = None
 
 
 def main() -> None:

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterator, Sequence, Tuple
+from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
 
 from dubby import languages as L
-from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine, option
+from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine, option, quantization_param, resolve_quantization
 from dubby.workers.protocol import TaskContext
+
+# 7.5B parameters: 16-bit weights alone are ~15 GB, so a 16 GB T4 needs 8-bit or 4-bit.
+SIZES = {"none": 18.0, "8bit": 10.0, "4bit": 6.5}
 
 
 class HunyuanMTTranslator(TranslationEngine):
@@ -20,27 +23,39 @@ class HunyuanMTTranslator(TranslationEngine):
         targets=["en", "es", "fr", "it", "hi", "zh", "ja", "arb"],
         requires=["transformers", "accelerate"],
         install="pip install transformers accelerate",
-        badges=["WMT25 winner", "33 languages"],
+        badges=["WMT25 winner", "33 languages", "4-bit on T4"],
         links={"model": "https://huggingface.co/tencent/Hunyuan-MT-7B"},
+        vram_gb=SIZES["none"],
         params=[
             ParamSpec("model", "Checkpoint", "select", "tencent/Hunyuan-MT-7B", [
                 option("tencent/Hunyuan-MT-7B", "Hunyuan-MT 7B"),
                 option("tencent/Hunyuan-MT-Chimera-7B", "Hunyuan-MT Chimera 7B"),
             ]),
+            quantization_param(),
             ParamSpec("sampling", "Use recommended sampling", "bool", False, help="top_k 20 · top_p 0.6 · temperature 0.7 (off = greedy, deterministic)"),
             ParamSpec("max_new_tokens", "Max new tokens", "number", 512, min=64, max=2048, step=64),
         ],
     )
-    load_params = ("model",)
+    load_params = ("model", "quantization")
+
+    @classmethod
+    def required_vram_gb(cls, params: Dict[str, Any], vram_gb: Optional[float] = None) -> Optional[float]:
+        return SIZES[resolve_quantization(params.get("quantization", "auto"), SIZES, vram_gb)]
+
+    @classmethod
+    def needs_cuda(cls, params: Dict[str, Any], vram_gb: Optional[float] = None) -> bool:
+        return resolve_quantization(params.get("quantization", "auto"), SIZES, vram_gb) in ("8bit", "4bit")
 
     def load(self, ctx: TaskContext) -> None:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        ctx.progress(0.02, f"Loading {self.params['model']}…")
+        mode = resolve_quantization(self.params.get("quantization", "auto"), SIZES, self.gpu_vram_gb())
+        ctx.progress(0.02, f"Loading {self.params['model']} ({'16-bit' if mode == 'none' else mode})…")
         self.tok = AutoTokenizer.from_pretrained(self.params["model"])
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.params["model"], dtype=self.torch_dtype(), device_map="cuda:0" if self.is_cuda else "cpu"
-        ).eval()
+        kwargs: Dict[str, Any] = dict(dtype=self.torch_dtype(), device_map="cuda:0" if self.is_cuda else "cpu")
+        if mode != "none":
+            kwargs["quantization_config"] = self.quantization_config(mode)
+        self.model = AutoModelForCausalLM.from_pretrained(self.params["model"], **kwargs).eval()
 
     @staticmethod
     def prompt(text: str, source: str, target: str) -> str:

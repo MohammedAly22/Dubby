@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownToLine, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, CheckCircle2, CloudDownload, Loader2, Trash2, X, XCircle } from 'lucide-react'
 import { useStudio } from '../store'
-import { cls } from '../utils'
+import type { DownloadEvent } from '../types'
+import { cls, fmtBytes } from '../utils'
 import { IconButton, Segmented } from './ui'
 
 type Level = 'all' | 'info' | 'warning' | 'error'
+
+const fmtEta = (s: number) =>
+  s < 60 ? `${Math.max(1, Math.ceil(s))}s` : s < 3600 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`
 
 export function LogsDrawer() {
   const open = useStudio((s) => s.logsOpen)
@@ -54,6 +58,7 @@ export function LogsDrawer() {
           </IconButton>
         </div>
       </div>
+      <Downloads />
       <div ref={box} className="flex-1 overflow-auto px-4 py-2 font-mono text-[11.5px] leading-5">
         {filtered.map((l, i) => (
           <div key={i} className="flex gap-3 whitespace-pre-wrap break-all">
@@ -66,6 +71,64 @@ export function LogsDrawer() {
           </div>
         ))}
         {!filtered.length && <div className="py-6 text-neutral-600">No logs yet.</div>}
+      </div>
+    </div>
+  )
+}
+
+/** Live model-weight downloads reported by the workers. */
+function Downloads() {
+  const downloads = useStudio((s) => s.downloads)
+  const list = useMemo(
+    () => Object.values(downloads).sort((a, b) => Number(a.done) - Number(b.done) || (b.total ?? 0) - (a.total ?? 0)),
+    [downloads],
+  )
+  if (!list.length) return null
+  const active = list.filter((d) => !d.done).length
+  return (
+    <div className="fade-in border-b border-line px-4 py-2.5">
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+        <CloudDownload className="size-3.5" /> Model downloads {active > 0 && <span className="font-mono normal-case tracking-normal text-neutral-400">· {active} active</span>}
+      </div>
+      <div className="flex max-h-40 flex-col gap-2.5 overflow-auto pr-1">
+        {list.map((d) => (
+          <DownloadRow key={d.id} d={d} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DownloadRow({ d }: { d: DownloadEvent & { phase?: string } }) {
+  const pct = d.total ? Math.min(1, d.downloaded / d.total) : null
+  const remaining = d.total && d.rate > 0 ? Math.max(0, d.total - d.downloaded) / d.rate : null
+  const width = d.done && !d.failed ? 1 : (pct ?? 0)
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-3 font-mono text-[11px]">
+        <span className="flex min-w-0 items-center gap-2">
+          {d.failed ? <XCircle className="size-3.5 shrink-0" /> : d.done ? <CheckCircle2 className="size-3.5 shrink-0" /> : <Loader2 className="size-3.5 shrink-0 animate-spin" />}
+          <span className="truncate text-neutral-200" title={d.name}>
+            {d.name}
+          </span>
+          {d.phase === 'reconstructing' && !d.done && <span className="shrink-0 text-neutral-500">reconstructing</span>}
+          {d.engine && <span className="hidden shrink-0 text-neutral-600 sm:inline">{d.engine}</span>}
+        </span>
+        <span className="shrink-0 text-neutral-400">
+          {fmtBytes(d.downloaded)}
+          {d.total ? ` / ${fmtBytes(d.total)}` : ''}
+          {pct !== null && !d.done && ` · ${Math.floor(pct * 100)}%`}
+          {!d.done && d.rate > 0 && ` · ${fmtBytes(d.rate)}/s`}
+          {!d.done && remaining !== null && ` · ${fmtEta(remaining)} left`}
+          {d.done && (d.failed ? ' · interrupted' : ' · done')}
+        </span>
+      </div>
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-white/10">
+        {pct === null && !d.done ? (
+          <div className="shimmer absolute inset-0" />
+        ) : (
+          <div className="bg-accent-gradient absolute inset-y-0 left-0 transition-[width] duration-300 ease-out" style={{ width: `${width * 100}%` }} />
+        )}
       </div>
     </div>
   )

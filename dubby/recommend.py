@@ -133,10 +133,18 @@ def _translation(source: str, target: str) -> List[Recommendation]:
         if source == "en":
             recs.append(R("indictrans2", "AI4Bharat IndicTrans2: state-of-the-art English→Hindi"))
         recs += [R("hunyuan-mt", f"WMT25-winning 7B translator for {src}→Hindi"), R("nllb", "Fast 200-language baseline"), R("llm", "Context-aware LLM translation")]
+    elif source == "ar" and target == "en":
+        recs += [
+            R("arzen-llm", "Llama-3-8B fine-tuned on code-switched Egyptian Arabic → English (ArzEn-LLM); fits a 16 GB T4 in 4-bit"),
+            R("llm", "Context-aware 4-bit LLM that keeps names and English words intact"),
+            R("nllb", "Reads Egyptian Arabic (arz_Arab) directly; fast and light", arabic_variety="arz_Arab"),
+            R("hunyuan-mt", "WMT25-winning 7B translator; loads in 4-bit on 16 GB GPUs"),
+        ]
     else:
-        recs.append(R("hunyuan-mt", f"WMT25-winning 7B model — strongest open translator for {src}→{tgt}"))
+        recs.append(R("hunyuan-mt", f"WMT25-winning 7B model — strongest open translator for {src}→{tgt} (4-bit on 16 GB GPUs)"))
         llm_reason = "Qwen instruct LLM — excellent for Chinese and Japanese, uses previous lines as context" if target in ("zh", "ja") else "Context-aware LLM translation that keeps spoken length"
-        recs += [R("llm", llm_reason), R("nllb", "Fast 200-language baseline, runs on small GPUs")]
+        nllb_params = {"arabic_variety": "arz_Arab"} if source == "ar" else {}
+        recs += [R("llm", llm_reason), R("nllb", "Fast 200-language baseline, runs on small GPUs", **nllb_params)]
     return recs
 
 

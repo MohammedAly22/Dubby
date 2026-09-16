@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import mimetypes
 import re
+import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,7 @@ from dubby import languages, recommend
 from dubby.config import save_settings
 from dubby.core import voices
 from dubby.core.studio import Studio, StudioError
+from dubby.errors import explain
 
 WEB_DIST = Path(__file__).resolve().parents[1] / "web" / "dist"
 mimetypes.add_type("text/vtt", ".vtt")
@@ -81,6 +83,12 @@ def _range_response(path: Path, request: Request, download: bool) -> Any:
     return StreamingResponse(stream(), status_code=206, media_type=media_type, headers=headers)
 
 
+class EngineCheck(BaseModel):
+    params: Dict[str, Any] = {}
+    source: Optional[str] = None
+    target: Optional[str] = None
+
+
 BATCH_WINDOW = 0.08  # seconds to gather events before sending one websocket frame
 BATCH_MAX = 250
 
@@ -96,6 +104,8 @@ def collapse_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             return ("stage", e.get("project_id"), e.get("stage"))
         if kind == "segment":
             return ("segment", e.get("project_id"), (e.get("segment") or {}).get("id"))
+        if kind == "download":
+            return ("download", e.get("id"))
         if kind in ("jobs", "engines"):
             return (kind,)
         return None  # logs, exports, … are all kept
@@ -132,6 +142,12 @@ def create_app(studio: Studio) -> FastAPI:
     async def not_found(_: Request, exc: KeyError):
         return JSONResponse({"detail": f"Not found: {exc}"}, status_code=404)
 
+    @app.exception_handler(Exception)
+    async def unexpected(request: Request, exc: Exception):
+        # Never hand the browser a bare "Internal Server Error": log the traceback, explain the cause.
+        studio.bus.log(f"{request.method} {request.url.path} failed:\n{traceback.format_exc()}", "error", source="api")
+        return JSONResponse({"detail": explain(exc).text()}, status_code=500)
+
     # ------------------------------------------------------------ system
     @app.get("/api/system")
     async def system():
@@ -159,6 +175,10 @@ def create_app(studio: Studio) -> FastAPI:
     @app.get("/api/engines")
     async def engines(refresh: bool = False):
         return await run_in_threadpool(studio.engines, refresh)
+
+    @app.post("/api/engines/{engine_id}/check")
+    async def check_engine(engine_id: str, body: EngineCheck):
+        return await run_in_threadpool(studio.check_engine, engine_id, body.params, body.source, body.target)
 
     @app.get("/api/languages")
     async def get_languages():
@@ -317,7 +337,7 @@ def create_app(studio: Studio) -> FastAPI:
 
         recv_task = asyncio.create_task(receiver())
         try:
-            await ws.send_json({"type": "hello", "jobs": studio.jobs.snapshot()})
+            await ws.send_json({"type": "hello", "jobs": studio.jobs.snapshot(), "downloads": list(studio.bus.downloads.values())})
             while not recv_task.done():
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=15)

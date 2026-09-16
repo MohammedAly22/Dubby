@@ -114,7 +114,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const DubRow = memo(function DubRow({ seg, index, projectId, rtl }: { seg: Segment; index: number; projectId: string; rtl: boolean }) {
   const updateSegment = useStudio((s) => s.updateSegment)
-  const runStage = useStudio((s) => s.runStage)
+  const regenerateClip = useStudio((s) => s.regenerateClip)
   const select = useStudio((s) => s.select)
   const selected = useStudio((s) => s.selectedId === seg.id)
   const active = usePlayer((s) => s.time >= seg.start && s.time < seg.end)
@@ -157,7 +157,7 @@ const DubRow = memo(function DubRow({ seg, index, projectId, rtl }: { seg: Segme
           <IconButton
             title={working ? 'Generating…' : 'Regenerate this clip'}
             disabled={working || !seg.translation.trim()}
-            onClick={() => runStage('tts', { segment_ids: [seg.id] })}
+            onClick={() => regenerateClip(seg.id)}
             className={cls(stale && 'bg-white text-black hover:bg-white hover:text-black')}
           >
             <RefreshCw className={cls('size-3.5', working && 'animate-spin')} />

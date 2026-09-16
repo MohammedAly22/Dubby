@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatedBackground } from './components/AnimatedBackground'
 import { LogsDrawer } from './components/LogsDrawer'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Toasts } from './components/Toasts'
 import { TopBar } from './components/TopBar'
@@ -26,8 +27,18 @@ export default function App() {
     connect()
     loadEngines()
     const onHash = () => setRoute(parseHash())
+    // a failed promise nobody awaited would otherwise vanish silently
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason
+      if (reason?.name === 'AbortError' || reason?.name === 'NotAllowedError') return // cancelled fetch / blocked autoplay
+      useStudio.getState().toast(reason?.message ?? String(reason ?? 'Something went wrong'), 'error')
+    }
     window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    window.addEventListener('unhandledrejection', onRejection)
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      window.removeEventListener('unhandledrejection', onRejection)
+    }
   }, [connect, loadEngines])
 
   return (
@@ -40,7 +51,11 @@ export default function App() {
           <code className="rounded bg-black/10 px-1.5 font-mono">dubby dev</code> to run the backend and this dev UI together. Retrying automatically…
         </div>
       )}
-      <main className="relative z-10 flex-1">{route.name === 'project' ? <ProjectPage key={route.id} id={route.id} /> : <HomePage />}</main>
+      <main className="relative z-10 flex-1">
+        <ErrorBoundary resetKey={route.name === 'project' ? route.id : 'home'}>
+          {route.name === 'project' ? <ProjectPage key={route.id} id={route.id} /> : <HomePage />}
+        </ErrorBoundary>
+      </main>
       <LogsDrawer />
       <SettingsDialog />
       <ConfirmDialog />

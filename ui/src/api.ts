@@ -1,20 +1,32 @@
-import type { EngineChoice, EngineInfo, ExportItem, JobsSnapshot, LanguagesPayload, LogEvent, Preset, Project, ProjectSummary, Segment } from './types'
+import type { EngineCheck, EngineChoice, EngineInfo, ExportItem, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Preset, Project, ProjectSummary, Segment } from './types'
 
 const BASE = 'api'
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init)
-  if (!res.ok) {
-    let detail: unknown = res.statusText
-    try {
-      const body = await res.json()
-      detail = body.detail ?? detail
-    } catch {
-      /* not json */
-    }
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, init)
+  } catch {
+    throw new Error('Can’t reach the Dubby studio — check that it is still running, then try again.')
   }
-  return res.json() as Promise<T>
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`.trim()
+    const text = await res.text().catch(() => '')
+    if (text) {
+      try {
+        const body = JSON.parse(text)
+        const d = body.detail ?? body.message
+        if (typeof d === 'string') detail = d
+        else if (Array.isArray(d)) detail = d.map((x: any) => x?.msg ?? JSON.stringify(x)).join('; ') // FastAPI validation errors
+      } catch {
+        if (!text.trimStart().startsWith('<')) detail = text.slice(0, 300) // plain-text error, not an HTML error page
+      }
+    }
+    if (res.status === 502 || res.status === 503 || res.status === 504) detail = `The studio is not responding (${res.status}) — it may be restarting. ${detail}`
+    throw new Error(detail || 'Request failed')
+  }
+  const type = res.headers.get('content-type') ?? ''
+  return (type.includes('json') ? res.json() : res.text()) as Promise<T>
 }
 
 const json = (method: string, body?: unknown): RequestInit => ({
@@ -44,7 +56,9 @@ export const api = {
     fd.append('file', file)
     return req<Project>(`/projects/${id}/source/upload`, { method: 'POST', body: fd })
   },
-  engines: (refresh = false) => req<{ engines: EngineInfo[]; families: Record<string, any> }>(`/engines${refresh ? '?refresh=true' : ''}`),
+  engines: (refresh = false) => req<{ engines: EngineInfo[]; families: Record<string, any>; gpu: GpuInfo | null }>(`/engines${refresh ? '?refresh=true' : ''}`),
+  checkEngine: (engine: string, params: Record<string, unknown>, source?: string | null, target?: string | null) =>
+    req<EngineCheck>(`/engines/${encodeURIComponent(engine)}/check`, json('POST', { params, source: source ?? null, target: target ?? null })),
   jobs: () => req<JobsSnapshot>('/jobs'),
   stopWorkers: () => req<JobsSnapshot>('/workers/stop', json('POST')),
   logs: (limit = 400) => req<LogEvent[]>(`/logs?limit=${limit}`),

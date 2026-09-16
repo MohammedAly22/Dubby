@@ -167,7 +167,7 @@ export interface ProjectSummary {
 export interface ParamSpec {
   key: string
   label: string
-  type: 'select' | 'number' | 'bool' | 'text'
+  type: 'select' | 'number' | 'bool' | 'text' | 'textarea'
   default: unknown
   options?: { value: unknown; label: string }[] | null
   min?: number | null
@@ -193,6 +193,11 @@ export interface EngineInfo {
   available: boolean
   missing: string[]
   family_error?: string | null
+  /** approximate VRAM (GB) at default params / cheapest configuration */
+  vram_default_gb?: number | null
+  vram_min_gb?: number | null
+  /** false when no configuration of this engine can run on the detected hardware */
+  fits_any?: boolean
 }
 
 export interface LogEvent {
@@ -231,4 +236,48 @@ export interface AsrPreviewSegment {
   start: number
   end: number
   text: string
+}
+
+export interface GpuInfo {
+  cuda: boolean
+  name: string
+  vram_gb: number | null
+}
+
+export interface OptionFit {
+  required_gb: number | null
+  fits: boolean
+}
+
+/** Result of POST /api/engines/{id}/check */
+export interface EngineCheck {
+  engine: string
+  gpu: GpuInfo | null
+  required_gb: number | null
+  needs_cuda: boolean
+  fits: boolean
+  message: string | null
+  suggestion: string | null
+  fix: { key: string; value: unknown } | null
+  options: Record<string, Record<string, OptionFit>>
+  preview: Record<string, string>
+}
+
+/** Live model download reported by a worker */
+export interface DownloadEvent {
+  type: 'download'
+  id: string
+  name: string
+  /** xet transfers report "downloading" then "reconstructing" */
+  phase?: 'downloading' | 'reconstructing'
+  downloaded: number
+  total: number | null
+  rate: number
+  elapsed: number
+  done: boolean
+  failed?: boolean
+  family?: string
+  project_id?: string | null
+  stage?: string | null
+  engine?: string | null
 }

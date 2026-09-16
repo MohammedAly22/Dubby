@@ -18,7 +18,7 @@ from dubby.workers.protocol import TaskContext
 class ParamSpec:
     key: str
     label: str
-    type: str = "text"  # select | number | bool | text
+    type: str = "text"  # select | number | bool | text | textarea
     default: Any = None
     options: Optional[List[Dict[str, Any]]] = None
     min: Optional[float] = None
@@ -29,6 +29,42 @@ class ParamSpec:
 
 def option(value: Any, label: Optional[str] = None) -> Dict[str, Any]:
     return {"value": value, "label": label or str(value)}
+
+
+QUANTIZATION_LABELS = {
+    "auto": "Auto — 16-bit if it fits this GPU, otherwise 4-bit",
+    "none": "None (16-bit)",
+    "8bit": "8-bit (bitsandbytes)",
+    "4bit": "4-bit NF4 (bitsandbytes)",
+}
+
+
+def quantization_param(modes: Sequence[str] = ("none", "8bit", "4bit"), default: str = "auto") -> ParamSpec:
+    """Standard ``quantization`` parameter; pair it with :func:`resolve_quantization`."""
+    return ParamSpec(
+        "quantization",
+        "Quantization",
+        "select",
+        default,
+        [option(m, QUANTIZATION_LABELS[m]) for m in ("auto", *modes)],
+        help="Lower precision needs less VRAM (4-bit ≈ ⅓ of 16-bit) with a small quality cost. 8/4-bit need an NVIDIA GPU.",
+    )
+
+
+def resolve_quantization(mode: str, sizes: Dict[str, float], vram_gb: Optional[float]) -> str:
+    """Turn ``auto`` into 16-bit when it fits ``vram_gb``, otherwise 4-bit.
+
+    8-bit is only used when chosen explicitly: bitsandbytes' int8 kernels are several
+    times slower than NF4 4-bit, so 4-bit is both lighter and faster on small GPUs.
+    """
+    if mode != "auto":
+        return mode
+    if vram_gb is None:
+        return "none"  # CPU (or unknown): full precision
+    for candidate in ("none", "4bit", "8bit"):
+        if candidate in sizes and sizes[candidate] <= vram_gb + 0.1:
+            return candidate
+    return min(sizes, key=lambda k: sizes[k])
 
 
 @dataclass
@@ -46,6 +82,7 @@ class EngineInfo:
     links: Dict[str, str] = field(default_factory=dict)
     gated: bool = False
     badges: List[str] = field(default_factory=list)
+    vram_gb: Optional[float] = None  # approximate GPU memory at default params (see Engine.required_vram_gb)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -67,6 +104,27 @@ class Engine:
     def load_key(cls, params: Dict[str, Any]) -> Tuple:
         merged = {**cls.info.defaults(), **(params or {})}
         return (cls.info.id,) + tuple(str(merged.get(k)) for k in cls.load_params)
+
+    # --------------------------------------------------------------- hardware
+    @classmethod
+    def required_vram_gb(cls, params: Dict[str, Any], vram_gb: Optional[float] = None) -> Optional[float]:
+        """Approximate GPU memory (GB) needed with ``params``; ``None`` means small or unknown.
+
+        ``vram_gb`` is the detected GPU size so ``quantization="auto"`` can resolve. The
+        worker refuses to load a model that cannot fit, and the UI greys out options
+        that exceed the GPU — so keep these estimates honest (weights + working memory).
+        """
+        return cls.info.vram_gb
+
+    @classmethod
+    def needs_cuda(cls, params: Dict[str, Any], vram_gb: Optional[float] = None) -> bool:
+        """True when these params cannot run on CPU (e.g. bitsandbytes checkpoints)."""
+        return False
+
+    @classmethod
+    def preview(cls, params: Dict[str, Any], source: Optional[str], target: Optional[str]) -> Dict[str, str]:
+        """Resolved values shown under the parameters in the UI (e.g. a prompt template)."""
+        return {}
 
     def load(self, ctx: TaskContext) -> None:  # pragma: no cover - interface
         raise NotImplementedError
@@ -97,6 +155,30 @@ class Engine:
         if prefer == "bfloat16" and not torch.cuda.is_bf16_supported():
             return torch.float16
         return getattr(torch, prefer)
+
+    def gpu_vram_gb(self) -> Optional[float]:
+        if not self.is_cuda:
+            return None
+        import torch
+
+        return torch.cuda.get_device_properties(0).total_memory / 1024**3
+
+    def quantization_config(self, mode: str):
+        """``BitsAndBytesConfig`` for ``8bit``/``4bit`` (``None`` for full precision)."""
+        if mode not in ("8bit", "4bit"):
+            return None
+        if not self.is_cuda:
+            raise RuntimeError("bitsandbytes quantization requires a CUDA GPU")
+        from transformers import BitsAndBytesConfig
+
+        if mode == "8bit":
+            return BitsAndBytesConfig(load_in_8bit=True)
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=self.torch_dtype(),
+        )
 
 
 class ASREngine(Engine):

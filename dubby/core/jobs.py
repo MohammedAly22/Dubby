@@ -17,9 +17,25 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 from dubby.config import Settings
 from dubby.core.events import EventBus
 from dubby.engines.registry import engine_class
+from dubby.errors import explain
 from dubby.workers.protocol import decode
 
 PACKAGE_ROOT = str(Path(__file__).resolve().parents[2])
+
+
+def engine_family(engine_id: str) -> Optional[str]:
+    try:
+        return engine_class(engine_id).info.family
+    except Exception:
+        return None
+
+
+def _human_bytes(num: float) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if num < 1024:
+            return f"{num:.0f} {unit}" if unit in ("B", "KB") else f"{num:.1f} {unit}"
+        num /= 1024
+    return f"{num:.1f} TB"
 
 
 def worker_env(settings: Settings) -> Dict[str, str]:
@@ -33,6 +49,10 @@ def worker_env(settings: Settings) -> Dict[str, str]:
     # own kernel — any import chain reaching matplotlib (whisperx → pyannote → lightning → torchmetrics)
     # would crash the worker. Workers are headless, so force a safe backend.
     env["MPLBACKEND"] = "Agg"
+    # Less fragmentation between models of different sizes loaded in one worker.
+    env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    # Workers turn download bars into progress events (dubby.workers.progress), so let them exist.
+    env.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
     if settings.hf_token:
         env["HF_TOKEN"] = settings.hf_token
     node = settings.resolved_node()
@@ -179,6 +199,7 @@ class JobManager:
         self._finished = threading.Event()
         self._cancelled_current = False
         self._stop = False
+        self._downloads_seen: Dict[str, float] = {}
         threading.Thread(target=self._loop, daemon=True, name="dubby-jobs").start()
 
     # ------------------------------------------------------------------ public
@@ -266,7 +287,7 @@ class JobManager:
                 self._finished.wait()
             except Exception as exc:
                 job.status = "error"
-                job.handlers.on_error(str(exc))
+                job.handlers.on_error(explain(exc, engine_family(job.engine)).text())
             finally:
                 if self._cancelled_current and job.status not in ("done", "error"):
                     job.status = "cancelled"
@@ -275,18 +296,39 @@ class JobManager:
                     self.current = None
                 self.bus.publish({"type": "jobs", "jobs": self.snapshot()})
 
+    def _on_download(self, family: str, event: Dict[str, Any], job: Optional[Job]) -> None:
+        key = f"{family}:{event.get('id')}"
+        total = event.get("total") or 0
+        big = total >= 20 * 1024 * 1024
+        if key not in self._downloads_seen:
+            self._downloads_seen[key] = time.time()
+            if big:
+                self.bus.log(f"⬇ Downloading {event.get('name')} ({_human_bytes(total)})", project_id=job.project_id if job else None, source=f"worker:{family}")
+        if event.get("done"):
+            started = self._downloads_seen.pop(key, time.time())
+            if big:
+                self.bus.log(f"✓ {event.get('name')} downloaded ({_human_bytes(total)} in {time.time() - started:.0f}s)", project_id=job.project_id if job else None, source=f"worker:{family}")
+        self.bus.download({**event, "id": key, "family": family, "project_id": job.project_id if job else None, "stage": job.stage if job else None, "engine": job.engine if job else None})
+
     def _on_worker_event(self, family: str, event: Dict[str, Any]) -> None:
         job = self.current
         etype = event.get("type")
         if etype == "exit":
-            if job and job.status == "running" and engine_class(job.engine).info.family == family:
+            self.bus.clear_downloads(family)
+            if job and job.status == "running" and engine_family(job.engine) == family:
                 if not self._cancelled_current:
                     job.status = "error"
-                    job.handlers.on_error(f"{family} worker exited unexpectedly (code {event.get('code')}). Check the logs — often out of memory.")
+                    code = event.get("code")
+                    info = explain(f"worker exited unexpectedly (code {code})", family)
+                    message = info.text() if info.kind == "killed" else f"The {family} worker exited unexpectedly (code {code}). Check the logs — this is often running out of memory."
+                    job.handlers.on_error(message)
                 self._finished.set()
             return
         if etype == "log":
             self.bus.log(event.get("message", ""), event.get("level", "info"), job.project_id if job else None, source=f"worker:{family}")
+            return
+        if etype == "download":
+            self._on_download(family, event, job)
             return
         if not job or event.get("task") != job.id:
             return
@@ -301,10 +343,19 @@ class JobManager:
                 self._finished.set()
             elif etype == "error":
                 job.status = "error"
+                kind = event.get("kind")
                 tb = event.get("traceback")
-                if tb:
+                if tb and kind not in ("vram",):  # a refused load is expected, not a crash
                     self.bus.log(tb, "error", job.project_id, source=f"worker:{family}")
-                job.handlers.on_error(event.get("error", "unknown error"))
+                message = event.get("error", "unknown error")
+                hint = event.get("hint")
+                job.handlers.on_error(f"{message} 💡 {hint}" if hint else message)
+                if kind == "cuda_fatal":
+                    # a CUDA context that hit a device-side assert is unusable: restart the worker
+                    worker = self.workers.get(family)
+                    if worker:
+                        self.bus.log(f"Restarting the {family} worker after a fatal CUDA error", "warning", job.project_id, source="jobs")
+                        worker.kill()
                 self._finished.set()
         except Exception as exc:  # handler bug must not wedge the queue
             self.bus.log(f"Job handler failed: {exc}", "error", job.project_id, source="jobs")
