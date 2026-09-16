@@ -256,6 +256,7 @@ flowchart LR
 | **CohereX** | `coherex` | core | ar en es fr it zh ja | wav2vec2 | VAD → Cohere → alignment · 🔒 |
 | **QwenCleo-ASR** | `qwencleo` | qwen | ar | wav2vec2 | <img src="assets/egypt.jpg" width="16" /> SOTA Egyptian + code-switching |
 | **Metro-ASR** | `metro-asr` | core | ar | wav2vec2 | <img src="assets/egypt.jpg" width="16" /> 61.6M CTC, fast on CPU |
+| **Google Gemini (API)** | `gemini-asr` | cloud | all 8 spoken | estimated or wav2vec2 | Long audio cut at silences and transcribed in parallel; no GPU · 🔑 Gemini key |
 | **Whisper language ID** | `whisper-langid` | core | 99 languages | — | Detects the spoken language |
 
 ### 🌍 Translation
@@ -273,6 +274,7 @@ flowchart LR
 
 > [!TIP]
 > **Translating on a 16 GB T4 (free Colab).** Engines and options that can't fit your GPU are greyed out with the reason, and *Apply fix* switches to a configuration that fits. Large translators load in 4-bit automatically (*Quantization → Auto*). The LLM prompt is a template: `{source}`, `{target}`, `{style}` and `{code_switching}` are filled in for each language pair, and *Preview* shows the result.
+| **Google Gemini (API)** | `gemini-translate` | cloud | any → any | Context-aware batches sent in parallel, editable system prompt; **default translator while a Gemini key is set** · 🔑 |
 | **Keep original text** | `passthrough` | core | same language | Re-voice without translating |
 
 ### 🔊 Text-to-speech
@@ -284,6 +286,18 @@ flowchart LR
 | **AI4Bharat IndicF5** | `indicf5` | indic | hi | fitted at render | [Natural Hindi cloning](https://huggingface.co/ai4bharat/IndicF5) · 🔒 |
 | **VoiceTut-TTS** | `voicetut` | core | all 9 (best: arz · arb) | ✅ | [380 h of Egyptian podcasts](https://huggingface.co/mohammedaly22/VoiceTut-TTS), 17 studio voices, OmniVoice backbone for other languages |
 | **Lahgtna OmniVoice v2** | `lahgtna-omnivoice` | core | all 9 (best: arz · arb) | ✅ | [13 Arabic dialects](https://huggingface.co/oddadmix/lahgtna-omnivoice-v2), diacritics-aware, OmniVoice backbone for other languages |
+
+| **Google Gemini TTS (API)** | `gemini-tts` | cloud | all 9 | pace hint + fitted at render | 30 preset voices with previews, dialect-aware style prompt, clips generated in parallel, no reference voice · 🔑 |
+
+### 🔷 Google Gemini engines
+
+Add a Gemini API key ([get one](https://aistudio.google.com/apikey)) in **⚙️ Settings → Gemini API key** or in the Colab notebook. Dubby verifies it with one tiny request before saving it, and shows only a masked preview afterwards. Then:
+
+- **Transcription:** audio is cut at silences into multi-minute chunks that are transcribed at the same time, each returning timed sentences.
+- **Translation:** batches of lines, each with the neighbouring lines as context, run in parallel. The system prompt is editable. While a key is set, Gemini is the default translator for new projects.
+- **Speech:** pick one of 30 preset voices in the Voice step (samples play in your dub language). All clips are generated concurrently.
+
+Gemini engines run in the CPU-only `cloud` family: starting them never unloads your local GPU models. Rate limits are retried automatically with backoff; lower *Parallel requests* if your quota is small.
 
 ### 🔢 Text normalization
 

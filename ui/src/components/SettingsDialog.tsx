@@ -3,6 +3,7 @@ import { Cpu, Power, RefreshCw, Save } from 'lucide-react'
 import { api } from '../api'
 import { useStudio } from '../store'
 import { CookiesField } from './CookiesField'
+import { GeminiKeyField } from './GeminiKeyField'
 import { Select } from './Select'
 import { Button, Field, Modal, Switch, inputCls } from './ui'
 
@@ -61,8 +62,15 @@ export function SettingsDialog() {
       ) : (
         <div className="flex flex-col gap-6">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Hugging Face token" hint={settings.hf_token ? 'A token is configured. Paste a new one to replace it.' : 'Needed for gated models (Cohere Transcribe).'}>
-              <input type="password" className={inputCls} placeholder={settings.hf_token ? '••••••••••••' : 'hf_…'} value={token} onChange={(e) => setToken(e.target.value)} />
+            <Field
+              label="Hugging Face token"
+              hint={
+                settings.hf_token
+                  ? `Configured: ${settings.hf_token_preview}${settings.hf_token_source === 'environment' ? ' (from the environment / Colab)' : ''}. Paste a new one to replace it.`
+                  : 'Needed for gated models (Cohere Transcribe, IndicF5).'
+              }
+            >
+              <input type="password" className={inputCls} placeholder={settings.hf_token ? settings.hf_token_preview : 'hf_…'} value={token} onChange={(e) => setToken(e.target.value)} />
             </Field>
             <Field label="Device" hint={`Resolved: ${settings.device_resolved}`}>
               <Select
@@ -80,6 +88,9 @@ export function SettingsDialog() {
             </Field>
             <Field label="Download proxy (optional)" hint="Not needed normally — YouTube downloads use automatic PO tokens. e.g. socks5://host:1080">
               <input className={inputCls} placeholder="none" value={settings.proxy ?? ''} onChange={(e) => set('proxy', e.target.value)} />
+            </Field>
+            <Field label="Gemini API key" className="sm:col-span-2">
+              <GeminiKeyField settings={settings} onChange={setSettings} />
             </Field>
             <Field label="YouTube cookies (optional)" className="sm:col-span-2">
               <CookiesField configured={!!settings.cookies_configured} onChange={(s) => setSettings(s)} />

@@ -163,6 +163,14 @@ def _supports(engine_id: str, kind: str, source: str, target: str) -> bool:
     return source in info.source_languages and target in info.targets
 
 
+_GEMINI = {"enabled": False}
+
+
+def set_gemini(enabled: bool) -> None:
+    """With a valid Gemini API key, Gemini becomes the top translation pick for every language pair."""
+    _GEMINI["enabled"] = bool(enabled)
+
+
 def recommendations(kind: str, source: str, target: str) -> List[Recommendation]:
     if kind == "asr":
         recs = ASR.get(source, [])
@@ -170,6 +178,8 @@ def recommendations(kind: str, source: str, target: str) -> List[Recommendation]
         recs = TTS.get(target, [])
     elif kind == "translation":
         recs = _translation(source, target)
+        if _GEMINI["enabled"] and not (recs and recs[0].engine == "passthrough"):
+            recs = [R("gemini-translate", "Your Gemini API key: fast, context-aware translation for any language pair")] + recs
     else:
         recs = []
     return [r for r in recs if _supports(r.engine, kind, source, target)]

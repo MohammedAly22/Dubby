@@ -54,6 +54,23 @@ def explain(error: Union[BaseException, str], family: Optional[str] = None) -> E
     repo = f" ({repo_match.group(1)})" if repo_match else ""
     env = f"the {family} environment" if family else "this environment"
 
+    if "api_key_invalid" in low or "api key not valid" in low or "no gemini api key" in low or "api key expired" in low:
+        return Explained(
+            "The Gemini API key is missing or not valid.",
+            "Add or update it in ⚙️ Settings → Gemini API key (get one at aistudio.google.com/apikey).",
+            "gemini_key",
+        )
+
+    if "resource_exhausted" in low or ("429" in low and ("gemini" in low or "quota" in low or "rate" in low)):
+        return Explained(
+            "Gemini's rate limit or quota was reached.",
+            "Lower 'Parallel requests' in the engine parameters, wait a minute and retry, or check your quota in Google AI Studio.",
+            "quota",
+        )
+
+    if "permission_denied" in low and ("generativelanguage" in low or "gemini" in low or "model" in low):
+        return Explained("This Gemini API key can't use the selected model.", "Pick another Gemini model in the parameters.", "gemini_key")
+
     if "insufficientvram" in low:
         return Explained(_first_line(text.split(":", 1)[-1]), kind="vram")
 

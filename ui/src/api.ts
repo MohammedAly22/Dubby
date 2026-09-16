@@ -50,6 +50,10 @@ export const api = {
     fd.append('file', file)
     return req<Record<string, any>>('/settings/cookies', { method: 'POST', body: fd })
   },
+  saveGeminiKey: (api_key: string) =>
+    req<{ ok: boolean; model?: string; latency_ms?: number; error?: string; settings: Record<string, any> }>('/settings/gemini', json('POST', { api_key })),
+  removeGeminiKey: () => req<Record<string, any>>('/settings/gemini', json('DELETE')),
+  geminiVoices: () => req<{ name: string; style: string; gender: 'female' | 'male' }[]>('/gemini/voices'),
   deleteCookies: () => req<Record<string, any>>('/settings/cookies', json('DELETE')),
   replaceSource: (id: string, file: File) => {
     const fd = new FormData()
@@ -113,7 +117,10 @@ export const fileUrl = (projectId: string, rel: string, version?: number | strin
   return `${BASE}/projects/${projectId}/files/${rel}${qs ? `?${qs}` : ''}`
 }
 
-export const presetAudioUrl = (name: string) => `${BASE}/voices/presets/${encodeURIComponent(name)}/audio`
+export const geminiVoicePreviewUrl = (voice: string, language: string) =>
+  `${BASE}/gemini/voices/${encodeURIComponent(voice)}/preview?language=${encodeURIComponent(language)}`
+
+export const presetAudioUrl =(name: string) => `${BASE}/voices/presets/${encodeURIComponent(name)}/audio`
 
 export function wsUrl() {
   const { protocol, host, pathname } = window.location

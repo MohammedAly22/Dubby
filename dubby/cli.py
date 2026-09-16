@@ -167,6 +167,24 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         console.print_json(json.dumps(families))
 
 
+# ------------------------------------------------------------------ gemini key
+def cmd_gemini_key(args: argparse.Namespace) -> None:
+    """Validate a Gemini API key with one tiny request and save it to the studio settings."""
+    from dubby.config import save_settings
+    from dubby.engines.gemini_common import validate_key
+
+    key = (args.key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        console.print(Text("  ❌ No key: pass --key or set GEMINI_API_KEY", style="bold red"))
+        sys.exit(1)
+    result = validate_key(key)
+    if not result.get("ok"):
+        console.print(Text(f"  ❌ {result.get('error')}", style="bold red"))
+        sys.exit(1)
+    settings = save_settings({"gemini_api_key": key})
+    console.print(Text(f"  ✅ Gemini API key works ({result['model']}, {result['latency_ms']} ms) and was saved to {settings.home}", style="bold green"))
+
+
 # -------------------------------------------------------------- youtube helper
 def cmd_youtube_helper(args: argparse.Namespace) -> None:
     """Build (and optionally test) the PO-token helper that lets YouTube downloads work without sign-in."""
@@ -331,6 +349,10 @@ def main(argv: List[str] | None = None) -> None:
     p = sub.add_parser("doctor", help="check tools, interpreters and engines")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_doctor)
+
+    p = sub.add_parser("gemini-key", help="validate and save a Gemini API key (or read GEMINI_API_KEY)")
+    p.add_argument("--key", help="the API key (safer: set GEMINI_API_KEY instead)")
+    p.set_defaults(func=cmd_gemini_key)
 
     p = sub.add_parser("youtube-helper", help="build the YouTube token helper (downloads without cookies or sign-in)")
     p.add_argument("--check", action="store_true", help="also start it once and ping it")

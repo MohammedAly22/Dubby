@@ -3,6 +3,7 @@ import { ArrowRight, AudioLines, Check, Crosshair, Info, Mic, Pause, Play, Sciss
 import { api, fileUrl, presetAudioUrl } from '../api'
 import { isArabic, lang, SOURCE_OPTIONS } from '../components/Flags'
 import { Select } from '../components/Select'
+import { GeminiVoicePicker } from './GeminiVoices'
 import { StageHeader } from '../components/StageHeader'
 import { Badge, Button, Field, Switch, inputCls } from '../components/ui'
 import { playPreview, stopPreview, usePlayer } from '../player'
@@ -25,6 +26,25 @@ export function VoicePanel({ project, onNext }: { project: Project; onNext: () =
   const arabicTarget = isArabic(project.settings.target)
   const [mode, setMode] = useState<Mode>(project.voice.mode === 'preset' && !arabicTarget && st?.status !== 'done' ? 'auto' : project.voice.mode)
   const [saving, setSaving] = useState(false)
+
+  if (project.settings.tts.engine === 'gemini-tts') {
+    return (
+      <div className="flex flex-col gap-6">
+        <StageHeader
+          icon="🧬"
+          title="Voice"
+          subtitle="You're dubbing with Gemini TTS: choose one of its preset voices. Switch to a cloning engine (VoiceTut, OmniVoice…) in the Dub step to use a reference voice instead."
+          state={st}
+          actions={
+            <Button variant="primary" icon={<ArrowRight className="size-4" />} onClick={onNext}>
+              Generate dub
+            </Button>
+          }
+        />
+        <GeminiVoicePicker project={project} />
+      </div>
+    )
+  }
 
   const apply = async (body: Record<string, unknown>) => {
     setSaving(true)

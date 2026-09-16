@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional
 
-from dubby.config import Settings
+from dubby.config import CPU_FAMILIES, Settings
 from dubby.core.events import EventBus
 from dubby.engines.registry import engine_class
 from dubby.errors import explain
@@ -55,6 +55,8 @@ def worker_env(settings: Settings) -> Dict[str, str]:
     env.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
     if settings.hf_token:
         env["HF_TOKEN"] = settings.hf_token
+    if settings.gemini_api_key:
+        env["GEMINI_API_KEY"] = settings.gemini_api_key
     node = settings.resolved_node()
     if node:
         env["PATH"] = str(Path(node).parent) + os.pathsep + env.get("PATH", "")
@@ -253,9 +255,10 @@ class JobManager:
 
     # ----------------------------------------------------------------- private
     def _worker(self, family: str) -> WorkerProcess:
-        if self.settings.exclusive_gpu:
+        if self.settings.exclusive_gpu and family not in CPU_FAMILIES:
             for other_family, other in self.workers.items():
-                if other_family != family and other.alive:
+                # API engines (cloud) hold no VRAM: never stop them, and they never stop GPU workers
+                if other_family != family and other_family not in CPU_FAMILIES and other.alive:
                     self.bus.log(f"Stopping {other_family} worker to free GPU memory", source="jobs")
                     other.stop()
         worker = self.workers.get(family)

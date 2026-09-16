@@ -83,6 +83,10 @@ def _range_response(path: Path, request: Request, download: bool) -> Any:
     return StreamingResponse(stream(), status_code=206, media_type=media_type, headers=headers)
 
 
+class GeminiKeyBody(BaseModel):
+    api_key: str
+
+
 class NormalizeBody(BaseModel):
     text: str
     language: str
@@ -209,6 +213,26 @@ def create_app(studio: Studio) -> FastAPI:
         return items[-limit:]
 
     # ------------------------------------------------------------ voices
+    @app.post("/api/settings/gemini")
+    async def save_gemini_key(body: GeminiKeyBody):
+        """Validate the key with one tiny request and save it only when it works."""
+        return await run_in_threadpool(studio.save_gemini_key, body.api_key)
+
+    @app.delete("/api/settings/gemini")
+    async def remove_gemini_key():
+        return (await run_in_threadpool(studio.remove_gemini_key)).public()
+
+    @app.get("/api/gemini/voices")
+    async def gemini_voices():
+        from dubby.engines.tts.gemini_tts import VOICES
+
+        return [{"name": name, "style": style, "gender": gender} for name, style, gender in VOICES]
+
+    @app.get("/api/gemini/voices/{voice}/preview")
+    async def gemini_voice_preview(voice: str, request: Request, language: str = "en"):
+        path = await run_in_threadpool(studio.gemini_voice_preview, voice, language)
+        return _range_response(path, request, False)
+
     @app.get("/api/voices/presets")
     async def presets():
         try:

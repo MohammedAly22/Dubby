@@ -33,7 +33,8 @@ export function DubPanel({ project, onNext, onVoice }: { project: Project; onNex
       over: ratios.filter((r) => r > 1.05).length,
     }
   }, [voiced])
-  const voiceReady = project.stages.voice?.status === 'done'
+  // Gemini TTS uses preset voices, so it needs no reference voice
+  const voiceReady = project.stages.voice?.status === 'done' || project.settings.tts.engine === 'gemini-tts'
 
   if (!translated.length) {
     return <Empty icon={<AudioLines className="size-8" />} title="Nothing to voice yet">Translate the transcript first.</Empty>

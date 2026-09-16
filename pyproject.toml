@@ -32,6 +32,7 @@ dependencies = [
     "yt-dlp[default]>=2026.8.19",
     "bgutil-ytdlp-pot-provider>=2.0.0",
     "huggingface_hub>=0.30",
+    "google-genai>=1.30",  # Gemini engines (cloud family) + key validation in the studio
 ]
 
 [project.optional-dependencies]

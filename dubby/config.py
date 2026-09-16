@@ -18,7 +18,17 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
-ENGINE_FAMILIES = ("core", "qwen", "nemo", "indic")
+ENGINE_FAMILIES = ("core", "qwen", "nemo", "indic", "cloud")
+# Families that use no GPU (API engines): they never stop, or get stopped by, GPU families.
+CPU_FAMILIES = ("cloud",)
+
+
+def mask_secret(value: Optional[str]) -> Optional[str]:
+    """``"AQ.Ab8…hYA"``-style preview so people can see which secret is saved without exposing it."""
+    if not value:
+        return None
+    value = str(value)
+    return f"{value[:5]}…{value[-4:]}" if len(value) > 12 else "…"
 
 
 def default_home() -> Path:
@@ -52,6 +62,7 @@ class Settings(BaseModel):
     port: int = 8765
     device: str = "auto"  # auto | cuda | cpu
     hf_token: Optional[str] = None
+    gemini_api_key: Optional[str] = None  # Google Gemini (ASR / translation / TTS engines)
     # Interpreter used for each engine family's worker process.
     worker_python: Dict[str, Optional[str]] = Field(default_factory=dict)
     # Stop workers of other families before starting one (frees GPU memory).
@@ -110,6 +121,11 @@ class Settings(BaseModel):
     def public(self) -> dict:
         data = self.model_dump()
         data["hf_token"] = bool(self.hf_token)
+        data["hf_token_preview"] = mask_secret(self.hf_token)
+        env_hf = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        data["hf_token_source"] = None if not self.hf_token else ("environment" if env_hf == self.hf_token else "settings")
+        data["gemini_api_key"] = bool(self.gemini_api_key)
+        data["gemini_key_preview"] = mask_secret(self.gemini_api_key)
         data["worker_python_resolved"] = {f: self.python_for(f) for f in ENGINE_FAMILIES}
         data["node_resolved"] = self.resolved_node()
         data["device_resolved"] = self.resolved_device()
@@ -147,6 +163,9 @@ def load_settings(reload: bool = False) -> Settings:
         token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
         if token and not s.hf_token:
             s.hf_token = token
+        gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if gemini and not s.gemini_api_key:
+            s.gemini_api_key = gemini
         for d in (s.projects_dir, s.cache_dir):
             d.mkdir(parents=True, exist_ok=True)
         _settings = s
@@ -159,7 +178,7 @@ def save_settings(update: dict) -> Settings:
     for key, value in update.items():
         if key not in merged:
             continue
-        if key == "hf_token" and value in (True, False):
+        if key in ("hf_token", "gemini_api_key") and value in (True, False):
             continue  # masked value coming back from the UI
         if key == "worker_python" and isinstance(value, dict):
             merged[key] = {k: (v or None) for k, v in value.items()}

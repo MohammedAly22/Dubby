@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple  # 
 from pydantic import ValidationError
 
 from dubby import hardware, languages, recommend
+from dubby.errors import explain
 from dubby.config import ENGINE_FAMILIES, Settings, load_settings, save_settings
 from dubby.core import voices
 from dubby.core.events import EventBus
@@ -79,6 +80,7 @@ class Studio:
         self._cancel_flags: Set[Tuple[str, str]] = set()
         self._last_progress_pub: Dict[Tuple[str, str], float] = {}
         self._recover()
+        recommend.set_gemini(bool(self.settings.gemini_api_key))
         threading.Thread(target=self._saver, daemon=True, name="dubby-saver").start()
         # build/start the YouTube token helper now so the first download doesn't wait for it
         pot.warm_up(self.settings, lambda msg, level="info": self.bus.log(msg, level, source="youtube"))
@@ -182,6 +184,8 @@ class Studio:
     def _require_available(self, engine_id: str) -> None:
         status = self.engine_status()
         info = get_info(engine_id)
+        if info.family == "cloud" and not self.settings.gemini_api_key:
+            raise StudioError(f"{info.name} needs a Gemini API key. Add it in ⚙️ Settings → Gemini API key.")
         fam = status.get(info.family, {})
         entry = fam.get("engines", {}).get(engine_id)
         if fam and entry and not entry.get("available"):
@@ -211,6 +215,9 @@ class Studio:
             d["available"] = bool(entry and entry.get("available"))
             d["missing"] = entry.get("missing", []) if entry else info.requires
             d["family_error"] = fam.get("error")
+            if info.family == "cloud" and not self.settings.gemini_api_key:
+                d["available"] = False
+                d["missing"] = ["Gemini API key (⚙️ Settings)"]
             try:
                 d.update(hardware.minimum_vram(info.id, gpu))
             except Exception:  # a buggy estimate must never hide the engine list
@@ -229,11 +236,52 @@ class Studio:
         }
 
     def apply_settings(self, settings: Settings) -> None:
+        key_changed = settings.gemini_api_key != self.settings.gemini_api_key
         self.settings = settings
         self.jobs.settings = settings
         for w in self.jobs.workers.values():
             w.settings = settings
+        recommend.set_gemini(bool(settings.gemini_api_key))
+        if key_changed and "cloud" in self.jobs.workers:
+            self.jobs.workers["cloud"].stop()  # the API key is passed to the worker at start-up
         self.pool.submit(self.engine_status, True)
+
+    # ------------------------------------------------------------ Gemini
+    def save_gemini_key(self, key: str) -> Dict[str, Any]:
+        """Validate a Gemini API key with one tiny request, then save it."""
+        from dubby.engines.gemini_common import validate_key
+
+        result = validate_key(key)
+        if not result.get("ok"):
+            return {**result, "settings": self.settings.public()}
+        settings = save_settings({"gemini_api_key": key.strip()})
+        self.apply_settings(settings)
+        self.bus.log(f"Gemini API key saved and verified ({result['model']}, {result['latency_ms']} ms)", source="settings")
+        self.bus.publish({"type": "engines"})
+        return {**result, "settings": settings.public()}
+
+    def remove_gemini_key(self) -> Settings:
+        settings = save_settings({"gemini_api_key": None})
+        self.apply_settings(settings)
+        self.bus.log("Gemini API key removed", source="settings")
+        self.bus.publish({"type": "engines"})
+        return settings
+
+    def gemini_voice_preview(self, voice: str, language: str) -> Path:
+        from dubby.engines.tts import gemini_tts
+
+        if not self.settings.gemini_api_key:
+            raise StudioError("Add a Gemini API key in ⚙️ Settings to preview Gemini voices.")
+        if voice not in gemini_tts.VOICE_NAMES:
+            raise StudioError(f"Unknown Gemini voice '{voice}'.")
+        language = language if language in gemini_tts.SAMPLE_TEXT else "en"
+        out = self.settings.cache_dir / "gemini_voices" / f"{voice}_{language}.wav"
+        try:
+            gemini_tts.preview_voice(voice, language, str(out), self.settings.gemini_api_key)
+        except Exception as exc:
+            out.unlink(missing_ok=True)
+            raise StudioError(explain(exc).text()) from None
+        return out
 
     # ================================================================ projects
     def _available_engines(self) -> Optional[Set[str]]:
@@ -241,7 +289,10 @@ class Studio:
             status = self._engine_status
         if not status:
             return None
-        return {eid for fam in status.values() for eid, entry in fam.get("engines", {}).items() if entry.get("available")}
+        ready = {eid for fam in status.values() for eid, entry in fam.get("engines", {}).items() if entry.get("available")}
+        if not self.settings.gemini_api_key:  # API engines need a key as well as the package
+            ready = {eid for eid in ready if get_info(eid).family != "cloud"}
+        return ready
 
     def _new_settings(self, source_language: str, target: str) -> Tuple[ProjectSettings, bool]:
         auto = source_language in ("auto", "", None)
@@ -889,7 +940,8 @@ class Studio:
         selected = [s for s in p.segments if (wanted is None or s.id in wanted) and s.translation.strip()]
         if not selected:
             raise StudioError("Nothing to voice — translate the segments first.")
-        resolve = self._voice_resolver(p)
+        # Gemini TTS speaks with a preset voice: no reference clip to resolve
+        resolve = (lambda s: (None, None)) if info.id == "gemini-tts" else self._voice_resolver(p)
         items, texts, spoken, previous = [], {}, {}, {}
         tts_dir = self.store.dir(project_id) / "tts"
         # Normalization happens here, once, for every TTS engine (engines receive the processed text

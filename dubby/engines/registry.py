@@ -18,6 +18,7 @@ ENGINES: Dict[str, str] = {
     "coherex": "dubby.engines.asr.coherex_engine:CohereXEngine",
     "qwencleo": "dubby.engines.asr.qwen:QwenCleoEngine",
     "metro-asr": "dubby.engines.asr.metro:MetroASREngine",
+    "gemini-asr": "dubby.engines.asr.gemini_asr:GeminiASREngine",
     # -------------------------------------------------------- translation
     "emhotob": "dubby.engines.translation.emhotob:EmhotobTranslator",
     "jisr": "dubby.engines.translation.jisr:JisrTranslator",
@@ -27,6 +28,7 @@ ENGINES: Dict[str, str] = {
     "indictrans2": "dubby.engines.translation.indictrans2:IndicTrans2Translator",
     "arzen-llm": "dubby.engines.translation.arzen:ArzEnTranslator",
     "llm": "dubby.engines.translation.llm:LLMTranslator",
+    "gemini-translate": "dubby.engines.translation.gemini_translate:GeminiTranslator",
     "passthrough": "dubby.engines.translation.passthrough:PassthroughTranslator",
     # ---------------------------------------------------------------- TTS
     "voicetut": "dubby.engines.tts.voicetut:VoiceTutEngine",
@@ -34,6 +36,7 @@ ENGINES: Dict[str, str] = {
     "omnivoice": "dubby.engines.tts.omnivoice:OmniVoiceBaseEngine",
     "qwen3-tts": "dubby.engines.tts.qwen3_tts:Qwen3TTSEngine",
     "indicf5": "dubby.engines.tts.indicf5:IndicF5Engine",
+    "gemini-tts": "dubby.engines.tts.gemini_tts:GeminiTTSEngine",
     # ------------------------------------------------------ language ID
     "whisper-langid": "dubby.engines.langid.whisper_langid:WhisperLangIdEngine",
     # --------------------------------------------------------- separation

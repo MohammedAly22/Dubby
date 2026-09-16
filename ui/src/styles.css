@@ -44,24 +44,25 @@
 
 html.light {
   color-scheme: light;
-  --color-white: #0c1206;
-  --color-black: #f6f8f1;
+  /* true white page with neutral (untinted) grays */
+  --color-white: #0a0a0a;
+  --color-black: #ffffff;
   --color-neutral-50: #0a0a0a;
   --color-neutral-100: #171717;
   --color-neutral-200: #262626;
-  --color-neutral-300: #3a3d36;
-  --color-neutral-400: #4d5147;
-  --color-neutral-500: #6a6e63;
-  --color-neutral-600: #8d9186;
-  --color-neutral-700: #b3b7ab;
-  --color-neutral-800: #d9ddd0;
-  --color-neutral-900: #e9ece2;
-  --color-neutral-950: #f1f4ea;
+  --color-neutral-300: #404040;
+  --color-neutral-400: #525252;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #a3a3a3;
+  --color-neutral-700: #d4d4d4;
+  --color-neutral-800: #e5e5e5;
+  --color-neutral-900: #f0f0f0;
+  --color-neutral-950: #f7f7f7;
 
-  --color-panel: rgba(255, 255, 255, 0.78);
-  --color-raised: #eef2e6;
-  --color-line: #e0e5d6;
-  --color-line-strong: #cdd4c0;
+  --color-panel: rgba(255, 255, 255, 0.94);
+  --color-raised: #f5f5f5;
+  --color-line: #ebebeb;
+  --color-line-strong: #d9d9d9;
   --color-accent-ink: #4d8a12;
   --blob-opacity: 0.05;
 }
