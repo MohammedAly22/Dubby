@@ -77,6 +77,7 @@ indic = [
 ]
 # Optional vocal / background separation for a cleaner mix.
 separation = ["demucs>=4.0.1"]
+dev = ["pytest>=8"]
 
 [project.scripts]
 dubby = "dubby.cli:main"

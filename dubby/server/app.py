@@ -83,6 +83,11 @@ def _range_response(path: Path, request: Request, download: bool) -> Any:
     return StreamingResponse(stream(), status_code=206, media_type=media_type, headers=headers)
 
 
+class NormalizeBody(BaseModel):
+    text: str
+    language: str
+
+
 class EngineCheck(BaseModel):
     params: Dict[str, Any] = {}
     source: Optional[str] = None
@@ -179,6 +184,11 @@ def create_app(studio: Studio) -> FastAPI:
     @app.post("/api/engines/{engine_id}/check")
     async def check_engine(engine_id: str, body: EngineCheck):
         return await run_in_threadpool(studio.check_engine, engine_id, body.params, body.source, body.target)
+
+    @app.post("/api/normalize")
+    async def normalize_text(body: NormalizeBody):
+        """Preview the processed text the TTS would receive for a dub language."""
+        return studio.normalize_preview(body.text, body.language)
 
     @app.get("/api/languages")
     async def get_languages():

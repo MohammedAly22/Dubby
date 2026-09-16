@@ -1,9 +1,9 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowRight, AudioLines, Headphones, Pause, Play, RefreshCw, Volume2 } from 'lucide-react'
-import { fileUrl } from '../api'
+import { api, fileUrl } from '../api'
 import { EnginePicker } from '../components/EnginePicker'
 import { StageHeader } from '../components/StageHeader'
-import { AutoTextarea, Button, Empty, Equalizer, IconButton, Progress, StatusIcon } from '../components/ui'
+import { AutoTextarea, Button, Empty, Equalizer, IconButton, Progress, Segmented, StatusIcon } from '../components/ui'
 import { playPreview, stopPreview, usePlayer } from '../player'
 import { useStudio } from '../store'
 import type { Project, Segment } from '../types'
@@ -18,7 +18,10 @@ export function DubPanel({ project, onNext, onVoice }: { project: Project; onNex
   const cancelStage = useStudio((s) => s.cancelStage)
   const saveChoice = useStudio((s) => s.saveChoice)
   const confirm = useStudio((s) => s.confirm)
+  const engines = useStudio((s) => s.engines)
   const setMode = usePlayer((s) => s.setMode)
+  const ttsInfo = engines.find((e) => e.id === project.settings.tts.engine)
+  const normalizeOn = !!ttsInfo?.params.some((p) => p.key === 'normalize') && project.settings.tts.params.normalize !== false
 
   const translated = project.segments.filter((s) => s.translation.trim())
   const voiced = translated.filter((s) => s.tts.status === 'done')
@@ -96,8 +99,82 @@ export function DubPanel({ project, onNext, onVoice }: { project: Project; onNex
         </div>
         {isArabic(project.settings.target) && <DiacriticsBar />}
         {translated.map((s) => (
-          <DubRow key={s.id} seg={s} index={project.segments.indexOf(s)} projectId={project.id} rtl={isRtl(project.settings.target)} />
+          <DubRow
+            key={s.id}
+            seg={s}
+            index={project.segments.indexOf(s)}
+            projectId={project.id}
+            rtl={isRtl(project.settings.target)}
+            target={project.settings.target}
+            normalizeOn={normalizeOn}
+          />
         ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The text exactly as the TTS model receives it. For a generated clip whose text hasn't changed it is
+ * the stored processed text; otherwise it is a live preview from the studio's normalizer.
+ */
+function ProcessedText({ seg, target, normalizeOn, rtl }: { seg: Segment; target: string; normalizeOn: boolean; rtl: boolean }) {
+  const stored = seg.tts.status === 'done' && seg.tts.text === seg.translation && seg.tts.normalized != null ? seg.tts.normalized : null
+  const [preview, setPreview] = useState<{ source: string; text: string; error: string | null } | null>(null)
+
+  useEffect(() => {
+    if (!normalizeOn || stored !== null) return
+    let alive = true
+    const timer = setTimeout(() => {
+      api
+        .normalize(seg.translation, target)
+        .then((r) => alive && setPreview({ source: seg.translation, text: r.normalized, error: r.error }))
+        .catch((e) => alive && setPreview({ source: seg.translation, text: seg.translation, error: e.message }))
+    }, 250)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [seg.translation, target, normalizeOn, stored])
+
+  if (!normalizeOn) {
+    return (
+      <div className="rounded-xl border border-dashed border-line-strong px-3 py-2 text-xs text-neutral-500">
+        Normalization is off for this engine, so the model reads the text exactly as written. Turn on <b>Normalize numbers &amp; symbols</b> in the voice parameters.
+      </div>
+    )
+  }
+
+  const current = stored ?? (preview && preview.source === seg.translation ? preview.text : null)
+  if (current === null) return <div className="shimmer h-16 rounded-xl" />
+
+  const rawWords = new Set(seg.translation.split(/\s+/).map((w) => w.replace(/[.,!?؟،;:]+$/, '')))
+  const tokens = current.split(/(\s+)/)
+  const changed = tokens.filter((t) => t.trim() && !rawWords.has(t.replace(/[.,!?؟،;:]+$/, ''))).length
+
+  return (
+    <div className="fade-in flex flex-col gap-1.5">
+      <div dir={rtl ? 'rtl' : 'auto'} className="rounded-xl border border-line-strong bg-black/30 px-3 py-2 text-sm leading-relaxed">
+        {tokens.map((t, i) =>
+          !t.trim() ? (
+            t
+          ) : rawWords.has(t.replace(/[.,!?؟،;:]+$/, '')) ? (
+            <span key={i} className="text-neutral-400">
+              {t}
+            </span>
+          ) : (
+            <span key={i} className="rounded bg-white/10 px-0.5 text-white" title="rewritten by normalization">
+              {t}
+            </span>
+          ),
+        )}
+      </div>
+      <div className="flex flex-wrap justify-between gap-2 px-1 text-[10px] text-neutral-500">
+        <span>{stored !== null ? 'Used for the current clip' : 'Preview — used on the next generation'}</span>
+        <span>
+          {changed ? `${changed} word${changed === 1 ? '' : 's'} rewritten` : 'no changes needed'}
+          {preview?.error && !stored ? ` · normalizer error, raw text will be used: ${preview.error}` : ''}
+        </span>
       </div>
     </div>
   )
@@ -112,7 +189,22 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-const DubRow = memo(function DubRow({ seg, index, projectId, rtl }: { seg: Segment; index: number; projectId: string; rtl: boolean }) {
+const DubRow = memo(function DubRow({
+  seg,
+  index,
+  projectId,
+  rtl,
+  target,
+  normalizeOn,
+}: {
+  seg: Segment
+  index: number
+  projectId: string
+  rtl: boolean
+  target: string
+  normalizeOn: boolean
+}) {
+  const [view, setView] = useState<'raw' | 'processed'>('raw')
   const updateSegment = useStudio((s) => s.updateSegment)
   const regenerateClip = useStudio((s) => s.regenerateClip)
   const select = useStudio((s) => s.select)
@@ -165,7 +257,23 @@ const DubRow = memo(function DubRow({ seg, index, projectId, rtl }: { seg: Segme
         </div>
       </div>
 
-      <AutoTextarea rtl={rtl} value={seg.translation} onCommit={(translation) => updateSegment(seg.id, { translation })} />
+      <div className="flex items-center justify-between gap-2 px-1">
+        <Segmented<'raw' | 'processed'>
+          size="sm"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'raw', label: 'Raw' },
+            { value: 'processed', label: 'Processed' },
+          ]}
+        />
+        {view === 'processed' && <span className="text-[10px] text-neutral-500">what the voice model reads</span>}
+      </div>
+      {view === 'raw' ? (
+        <AutoTextarea rtl={rtl} value={seg.translation} onCommit={(translation) => updateSegment(seg.id, { translation })} />
+      ) : (
+        <ProcessedText seg={seg} target={target} normalizeOn={normalizeOn} rtl={rtl} />
+      )}
 
       <div className="flex items-center gap-3 px-1">
         <button

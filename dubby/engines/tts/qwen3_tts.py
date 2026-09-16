@@ -9,6 +9,7 @@ from typing import Any, Iterator, List, Sequence, Tuple
 from dubby import languages as L
 from dubby.engines.asr.common import batched
 from dubby.engines.base import EngineInfo, ParamSpec, TTSEngine, TTSItem, option
+from dubby.engines.tts.omnivoice_base import normalize_param
 from dubby.workers.protocol import TaskContext
 
 
@@ -31,6 +32,7 @@ class Qwen3TTSEngine(TTSEngine):
             ]),
             ParamSpec("batch_size", "Batch size", "number", 4, min=1, max=16, step=1),
             ParamSpec("x_vector_only", "Speaker embedding only", "bool", False, help="Clone from the speaker embedding without the reference transcript (less faithful)."),
+            normalize_param(),
         ],
     )
     load_params = ("model",)

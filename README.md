@@ -282,8 +282,21 @@ flowchart LR
 | **OmniVoice** | `omnivoice` | core | all 9 | ✅ | [646 languages](https://huggingface.co/k2-fsa/OmniVoice), zero-shot cloning |
 | **Qwen3-TTS** | `qwen3-tts` | qwen | en zh ja es fr it | fitted at render | [Expressive cloning](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base), 1.7B / 0.6B |
 | **AI4Bharat IndicF5** | `indicf5` | indic | hi | fitted at render | [Natural Hindi cloning](https://huggingface.co/ai4bharat/IndicF5) · 🔒 |
-| **VoiceTut-TTS** | `voicetut` | core | arz · arb | ✅ | [380 h of Egyptian podcasts](https://huggingface.co/mohammedaly22/VoiceTut-TTS), 17 studio voices |
-| **Lahgtna OmniVoice v2** | `lahgtna-omnivoice` | core | arz · arb | ✅ | [13 Arabic dialects](https://huggingface.co/oddadmix/lahgtna-omnivoice-v2), diacritics-aware |
+| **VoiceTut-TTS** | `voicetut` | core | all 9 (best: arz · arb) | ✅ | [380 h of Egyptian podcasts](https://huggingface.co/mohammedaly22/VoiceTut-TTS), 17 studio voices, OmniVoice backbone for other languages |
+| **Lahgtna OmniVoice v2** | `lahgtna-omnivoice` | core | all 9 (best: arz · arb) | ✅ | [13 Arabic dialects](https://huggingface.co/oddadmix/lahgtna-omnivoice-v2), diacritics-aware, OmniVoice backbone for other languages |
+
+### 🔢 Text normalization
+
+With **Normalize numbers & symbols** on (the default), the studio rewrites each line for the dub language **before** it reaches any TTS engine. It handles numbers, decimals, ordinals, money, percentages, units, dates, clock times, phone numbers, emails, URLs, @handles, #hashtags, abbreviations, symbols and acronyms. Engines never normalize again, so what you see is exactly what the voice reads: flip a clip to **Processed** to compare it with the **Raw** text, with rewritten words highlighted.
+
+| Dub language | Examples |
+| :-- | :-- |
+| <img src="assets/egypt.jpg" width="16" /> Egyptian | VoiceTut-TTS's rules **without diacritics**: `3:30` → تلاتة و نص · `01147450629` → زيرو حداشر، سبعه وأربعين… · your own tashkeel is kept |
+| <img src="assets/KSA.jpg" width="16" /> MSA | Grammatical agreement: `3 ساعات` → ثلاث ساعات · `11 دقيقة` → إحدى عشرة دقيقة · `$1,250.50` → ألف ومئتان وخمسون دولارا وخمسون سنتا |
+| <img src="assets/USA.jpg" width="16" /> English | `May 5, 2024` → May fifth, twenty twenty-four · `1.5M` → one point five million · `No. 7` → number seven |
+| <img src="assets/Spain.png" width="16" /> <img src="assets/France.png" width="16" /> <img src="assets/Italy.png" width="16" /> | Gender and elision: veintiún años · soixante et onze · un million d'euros · un'ora · alle sedici meno un quarto |
+| <img src="assets/India.png" width="16" /> Hindi | Indian numbering and clock: `1,00,000` → एक लाख · `10:30` → साढ़े दस बजे |
+| <img src="assets/China.jpg" width="16" /> <img src="assets/Japan.png" width="16" /> | `2公里` → 两公里 · `15%` → 百分之十五 · `2024年` → 二零二四年 · `時速60km/h` → 時速六十キロ |
 
 > [!IMPORTANT]
 > **Reference voice language matters.** Voice cloning copies the accent of the reference clip. For natural Spanish, Chinese and other dubs, use *From this video*, *Auto per segment* or an uploaded recording in the dub language. The built-in studio voices are Egyptian Arabic.

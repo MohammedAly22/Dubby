@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dubby import languages as L
 from dubby.engines.base import EngineInfo
 from dubby.engines.tts.omnivoice_base import OmniVoiceEngine, omnivoice_params
 
@@ -10,8 +11,8 @@ class LahgtnaOmniVoiceEngine(OmniVoiceEngine):
         kind="tts",
         name="Lahgtna OmniVoice v2",
         family="core",
-        description="لهجتنا — OmniVoice fine-tuned by oddadmix for 13 Arabic dialects incl. Egyptian. Diacritics (تشكيل) improve pronunciation. MSA via the 'arb' language id.",
-        targets=["arz", "arb"],
+        description="لهجتنا — OmniVoice fine-tuned by oddadmix for 13 Arabic dialects incl. Egyptian. Diacritics (تشكيل) improve pronunciation. MSA via the 'arb' language id; other languages run through the OmniVoice backbone.",
+        targets=list(L.TARGET_CODES),
         requires=["omnivoice"],
         install="pip install omnivoice",
         badges=["multi-dialect", "diacritics", "voice cloning"],

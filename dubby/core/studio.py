@@ -26,6 +26,8 @@ from dubby.core.storage import ProjectStore
 from dubby.engines.registry import all_infos, get_info
 from dubby.media import ffmpeg, pot, youtube
 from dubby.pipeline.chunking import fill_word_times, split_segment_words
+from dubby.text import SUPPORTED as TEXT_LANGUAGES
+from dubby.text import normalize_safe
 from dubby.pipeline.render import render_project
 from dubby.schemas import (
     EngineChoice,
@@ -864,6 +866,17 @@ class Studio:
         return auto
 
     # ------------------------------------------------------------------ TTS
+    @staticmethod
+    def _normalize_on(info: Any, params: Dict[str, Any]) -> bool:
+        if not any(spec.key == "normalize" for spec in info.params):
+            return False
+        return bool(params.get("normalize", True))
+
+    def normalize_preview(self, text: str, language: str) -> Dict[str, Any]:
+        """Processed text for a language, as the TTS would receive it (studio preview)."""
+        normalized, error = normalize_safe(text or "", language)
+        return {"language": language, "supported": language in TEXT_LANGUAGES, "text": text, "normalized": normalized, "error": error}
+
     def run_tts(self, project_id: str, engine: Optional[str] = None, params: Optional[Dict[str, Any]] = None, segment_ids: Optional[List[str]] = None) -> Job:
         p = self.store.get(project_id)
         choice = self._choice(project_id, "tts", engine, params)
@@ -877,19 +890,31 @@ class Studio:
         if not selected:
             raise StudioError("Nothing to voice — translate the segments first.")
         resolve = self._voice_resolver(p)
-        items, texts, previous = [], {}, {}
+        items, texts, spoken, previous = [], {}, {}, {}
         tts_dir = self.store.dir(project_id) / "tts"
+        # Normalization happens here, once, for every TTS engine (engines receive the processed text
+        # and never normalize again). The processed text is stored on the clip so the UI can show it.
+        normalize_on = self._normalize_on(info, choice.params)
+        failures = []
         for s in selected:
             ref_audio, ref_text = resolve(s)
+            if normalize_on:
+                spoken[s.id], error = normalize_safe(s.translation, target)
+                if error:
+                    failures.append(error)
+            else:
+                spoken[s.id] = " ".join(s.translation.split())
             items.append({
                 "id": s.id,
-                "text": s.translation,
+                "text": spoken[s.id],
                 "out_path": str(tts_dir / f"{s.id}_v{s.tts.version + 1}.wav"),
                 "ref_audio": ref_audio,
                 "ref_text": ref_text,
                 "duration": round(s.duration, 3),
             })
             texts[s.id] = s.translation
+        if failures:
+            self.bus.log(f"Text normalization failed for {len(failures)} segment(s), using the raw text: {failures[0]}", "warning", project_id, source="tts")
         with self.store.mutate(project_id) as proj:
             for s in proj.segments:
                 if s.id in texts:
@@ -919,7 +944,15 @@ class Studio:
                         new_rel = self.store.rel(project_id, data["path"])
                         if old and old != new_rel:
                             (self.store.dir(project_id) / old).unlink(missing_ok=True)
-                        seg.tts = TTSState(status="done", audio=new_rel, duration=round(float(data["duration"]), 3), text=data.get("text", texts.get(seg.id)), engine=info.id, version=seg.tts.version + 1)
+                        seg.tts = TTSState(
+                            status="done",
+                            audio=new_rel,
+                            duration=round(float(data["duration"]), 3),
+                            text=texts.get(seg.id, data.get("text")),
+                            normalized=spoken.get(seg.id) if normalize_on else None,
+                            engine=info.id,
+                            version=seg.tts.version + 1,
+                        )
                         done_count["n"] += 1
                     else:
                         seg.tts.status, seg.tts.error = "error", data.get("error")

@@ -27,6 +27,8 @@ export interface TTSState {
   audio?: string | null
   duration?: number | null
   text?: string | null
+  /** what the TTS model actually received after normalization (null when normalization was off) */
+  normalized?: string | null
   engine?: string | null
   version: number
   error?: string | null

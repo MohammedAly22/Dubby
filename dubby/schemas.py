@@ -35,7 +35,8 @@ class TTSState(BaseModel):
     status: Literal["pending", "queued", "running", "done", "error"] = "pending"
     audio: Optional[str] = None  # path relative to the project dir
     duration: Optional[float] = None
-    text: Optional[str] = None  # the text that produced `audio`
+    text: Optional[str] = None  # the text that produced `audio` (as written in the translation)
+    normalized: Optional[str] = None  # what the TTS model actually received after normalization (None = off)
     engine: Optional[str] = None
     version: int = 0
     error: Optional[str] = None

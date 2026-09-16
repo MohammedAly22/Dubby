@@ -59,6 +59,8 @@ export const api = {
   engines: (refresh = false) => req<{ engines: EngineInfo[]; families: Record<string, any>; gpu: GpuInfo | null }>(`/engines${refresh ? '?refresh=true' : ''}`),
   checkEngine: (engine: string, params: Record<string, unknown>, source?: string | null, target?: string | null) =>
     req<EngineCheck>(`/engines/${encodeURIComponent(engine)}/check`, json('POST', { params, source: source ?? null, target: target ?? null })),
+  normalize: (text: string, language: string) =>
+    req<{ language: string; supported: boolean; text: string; normalized: string; error: string | null }>('/normalize', json('POST', { text, language })),
   jobs: () => req<JobsSnapshot>('/jobs'),
   stopWorkers: () => req<JobsSnapshot>('/workers/stop', json('POST')),
   logs: (limit = 400) => req<LogEvent[]>(`/logs?limit=${limit}`),

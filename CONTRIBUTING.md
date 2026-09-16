@@ -319,7 +319,36 @@ export const TARGET_CODES = [..., 'apc'] as const             // SOURCE_CODES fo
 
 `arabic: true` enables the tashkeel bar in the voice step.
 
-### 5. Check
+### 5. Teach the text normalizer the language: `dubby/text/`
+
+Before TTS, every line goes through a per-language normalizer (numbers, money, dates, times, units, emails, abbreviations…). Add a `Rules` subclass. The shared pipeline in `dubby/text/common.py` does the pattern matching, so you only supply the language's words:
+
+```python
+# dubby/text/apc.py
+from dubby.text.common import Money, Noun, Rules
+from dubby.text.arb import MSARules   # a dialect can start from a close language
+
+
+class LevantineRules(MSARules):
+    code = "apc"
+    words = {**MSARules.words, "percent": "بالمية"}
+
+    def cardinal(self, n: int) -> str:
+        ...  # spoken number words
+
+    def time(self, hour, minute, period):
+        ...  # "الساعة عشرة ونص"
+```
+
+Register it in `dubby/text/__init__.py` (`_RULES["apc"] = ("dubby.text.apc", "LevantineRules")`) and add cases to `tests/test_text_normalization.py`:
+
+```bash
+pip install -e ".[dev]" && python -m pytest tests/test_text_normalization.py -q
+```
+
+Useful hooks: `ordinal()`, `count()` (number + noun agreement), `money()`, `date()`, `is_year()`, `cardinal_before()` (gender from the next word) and `before()` / `after()` for extra regex passes. Languages without rules still get whitespace cleanup.
+
+### 6. Check
 
 ```bash
 dubby languages       # the new row, with recommended engines per stage

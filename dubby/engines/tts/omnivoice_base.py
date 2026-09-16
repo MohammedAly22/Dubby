@@ -12,6 +12,17 @@ from dubby.engines.base import ParamSpec, TTSEngine, TTSItem, option
 from dubby.workers.protocol import TaskContext
 
 
+def normalize_param() -> ParamSpec:
+    """The studio normalizes the text before any TTS engine sees it (``dubby.text``)."""
+    return ParamSpec(
+        "normalize",
+        "Normalize numbers & symbols",
+        "bool",
+        True,
+        help="Numbers, dates, times, money, units, emails and abbreviations become words for the dub language. See each clip's processed text.",
+    )
+
+
 def omnivoice_params(default_model: str, extra: Optional[List[ParamSpec]] = None) -> List[ParamSpec]:
     return [
         ParamSpec("model", "Checkpoint", "text", default_model),
@@ -24,7 +35,7 @@ def omnivoice_params(default_model: str, extra: Optional[List[ParamSpec]] = None
         ParamSpec("num_step", "Decoding steps", "number", 32, min=4, max=64, step=4),
         ParamSpec("guidance_scale", "Guidance scale", "number", 2.0, min=0.5, max=5.0, step=0.1),
         ParamSpec("batch_size", "Batch size", "number", 4, min=1, max=16, step=1),
-        ParamSpec("normalize", "Normalize numbers & symbols", "bool", True),
+        normalize_param(),
         ParamSpec("denoise", "Denoise token", "bool", True),
     ] + (extra or [])
 
@@ -47,24 +58,13 @@ class OmniVoiceEngine(TTSEngine):
         ctx.progress(0.02, f"Loading {self.params['model']}…")
         self.model = OmniVoice.from_pretrained(self.params["model"], device_map=self._device_map(), dtype=self._torch_dtype())
         self._prompts: "OrderedDict[Tuple, Any]" = OrderedDict()
-        self._normalizer = None
 
     # ----------------------------------------------------------------- text
-    def normalizer(self):
-        if self._normalizer is None:
-            try:
-                from voicetut_tts import ArabicNormalizer
-
-                self._normalizer = ArabicNormalizer()
-            except Exception:
-                self._normalizer = False
-        return self._normalizer or None
-
-    def prepare_text(self, text: str, target: str) -> str:
-        text = " ".join(text.split())
-        # The VoiceTut normalizer is Arabic-specific; other languages use OmniVoice's own normalization.
-        norm = self.normalizer() if self.params.get("normalize", True) and L.is_arabic(target) else None
-        return norm.normalize(text) if norm else text
+    @staticmethod
+    def prepare_text(text: str, target: str) -> str:
+        # Already normalized by the studio (dubby.text) when "Normalize" is on. Neither VoiceTut's
+        # nor OmniVoice's own normalizer runs here, so the processed text shown in the UI is exact.
+        return " ".join(text.split())
 
     # --------------------------------------------------------------- voices
     def _prompt(self, ref_audio: Optional[str], ref_text: Optional[str]):
@@ -85,7 +85,7 @@ class OmniVoiceEngine(TTSEngine):
         kwargs: Dict[str, Any] = dict(
             text=texts,
             language=[L.get(target).omnivoice] * len(batch),
-            normalize_text=bool(self.params.get("normalize", True)) and not L.is_arabic(target),
+            normalize_text=False,
             num_step=int(self.params["num_step"]),
             guidance_scale=float(self.params["guidance_scale"]),
             denoise=bool(self.params.get("denoise", True)),

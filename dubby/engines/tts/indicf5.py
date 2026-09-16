@@ -6,6 +6,7 @@ import os
 from typing import Iterator, Sequence, Tuple
 
 from dubby.engines.base import EngineInfo, ParamSpec, TTSEngine, TTSItem
+from dubby.engines.tts.omnivoice_base import normalize_param
 from dubby.workers.protocol import TaskContext
 
 SAMPLE_RATE = 24000
@@ -24,7 +25,7 @@ class IndicF5Engine(TTSEngine):
         gated=True,
         badges=["Hindi", "voice cloning", "gated"],
         links={"model": "https://huggingface.co/ai4bharat/IndicF5"},
-        params=[ParamSpec("model", "Checkpoint", "text", "ai4bharat/IndicF5")],
+        params=[ParamSpec("model", "Checkpoint", "text", "ai4bharat/IndicF5"), normalize_param()],
     )
     load_params = ("model",)
 
