@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatedBackground } from './components/AnimatedBackground'
 import { LogsDrawer } from './components/LogsDrawer'
+import { ConfirmDialog } from './components/ConfirmDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { Toasts } from './components/Toasts'
 import { TopBar } from './components/TopBar'
@@ -42,6 +43,7 @@ export default function App() {
       <main className="relative z-10 flex-1">{route.name === 'project' ? <ProjectPage key={route.id} id={route.id} /> : <HomePage />}</main>
       <LogsDrawer />
       <SettingsDialog />
+      <ConfirmDialog />
       <Toasts />
     </div>
   )

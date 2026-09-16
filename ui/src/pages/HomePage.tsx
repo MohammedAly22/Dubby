@@ -164,6 +164,7 @@ export function HomePage() {
 
 function ProjectCard({ p, index, onDeleted }: { p: ProjectSummary; index: number; onDeleted: () => void }) {
   const toast = useStudio((s) => s.toast)
+  const confirm = useStudio((s) => s.confirm)
   const src = lang(p.settings.source_language)
   const tgt = lang(p.settings.target)
   return (
@@ -221,7 +222,13 @@ function ProjectCard({ p, index, onDeleted }: { p: ProjectSummary; index: number
               className="rounded-full p-1 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-white hover:text-black active:scale-90"
               onClick={async (e) => {
                 e.preventDefault()
-                if (!confirm(`Delete “${p.title}” and all its files?`)) return
+                const ok = await confirm({
+                  title: 'Delete this project?',
+                  message: `“${p.title}” and everything in it — the video, transcripts, translations, voice clips and exports — will be removed from disk. This cannot be undone.`,
+                  confirmLabel: 'Delete project',
+                  tone: 'danger',
+                })
+                if (!ok) return
                 try {
                   await api.remove(p.id)
                   onDeleted()

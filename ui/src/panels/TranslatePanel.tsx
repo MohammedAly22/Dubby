@@ -18,6 +18,7 @@ export function TranslatePanel({ project, onNext }: { project: Project; onNext: 
   const cancelStage = useStudio((s) => s.cancelStage)
   const saveChoice = useStudio((s) => s.saveChoice)
   const patchSettings = useStudio((s) => s.patchSettings)
+  const confirm = useStudio((s) => s.confirm)
   const done = project.segments.filter((s) => s.translation_status === 'done').length
   const missing = project.segments.filter((s) => s.translation_status !== 'done' || translationStale(s)).map((s) => s.id)
 
@@ -40,8 +41,16 @@ export function TranslatePanel({ project, onNext }: { project: Project; onNext: 
               {done > 0 && missing.length > 0 && (
                 <Button onClick={() => runStage('translation', { segment_ids: missing })}>Translate {missing.length} missing</Button>
               )}
-              <Button variant={done ? 'secondary' : 'primary'} icon={<Languages className="size-4" />} onClick={() => {
-                if (done && !confirm('Retranslate every segment? Your edits will be replaced.')) return
+              <Button variant={done ? 'secondary' : 'primary'} icon={<Languages className="size-4" />} onClick={async () => {
+                if (done) {
+                  const ok = await confirm({
+                    title: 'Retranslate every segment?',
+                    message: `All ${done} translated segment${done === 1 ? '' : 's'} will be translated again, replacing any wording you edited by hand.`,
+                    confirmLabel: 'Retranslate all',
+                    icon: '🌍',
+                  })
+                  if (!ok) return
+                }
                 runStage('translation')
               }}>
                 {done ? 'Retranslate all' : 'Translate all'}

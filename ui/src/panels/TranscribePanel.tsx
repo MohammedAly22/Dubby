@@ -17,6 +17,7 @@ export function TranscribePanel({ project, onNext }: { project: Project; onNext:
   const saveChoice = useStudio((s) => s.saveChoice)
   const patchSettings = useStudio((s) => s.patchSettings)
   const preview = useStudio((s) => s.asrPreview)
+  const confirm = useStudio((s) => s.confirm)
   const follow = usePlayer((s) => s.follow)
   const setFollow = usePlayer((s) => s.setFollow)
   const [advanced, setAdvanced] = useState(false)
@@ -35,8 +36,17 @@ export function TranscribePanel({ project, onNext }: { project: Project; onNext:
             <Button onClick={() => cancelStage('asr')}>Cancel</Button>
           ) : (
             <>
-              <Button variant={project.segments.length ? 'secondary' : 'primary'} icon={<Mic className="size-4" />} disabled={!ready} onClick={() => {
-                if (project.segments.length && !confirm('Re-transcribing replaces all segments, translations and generated voices. Continue?')) return
+              <Button variant={project.segments.length ? 'secondary' : 'primary'} icon={<Mic className="size-4" />} disabled={!ready} onClick={async () => {
+                if (project.segments.length) {
+                  const ok = await confirm({
+                    title: 'Re-transcribe this video?',
+                    message: `All ${project.segments.length} segments are rebuilt from the audio, so every translation and generated voice clip is discarded along with your edits.`,
+                    confirmLabel: 'Re-transcribe',
+                    tone: 'danger',
+                    icon: '🎙️',
+                  })
+                  if (!ok) return
+                }
                 runStage('asr')
               }}>
                 {project.segments.length ? 'Re-transcribe' : 'Transcribe'}
@@ -125,6 +135,7 @@ const TranscriptRow = memo(function TranscriptRow({ seg, index, projectId, last 
   const select = useStudio((s) => s.select)
   const updateSegment = useStudio((s) => s.updateSegment)
   const toast = useStudio((s) => s.toast)
+  const confirm = useStudio((s) => s.confirm)
   const seek = usePlayer((s) => s.seek)
   const playRange = usePlayer((s) => s.playRange)
   const [splitMode, setSplitMode] = useState(false)
@@ -157,7 +168,18 @@ const TranscriptRow = memo(function TranscriptRow({ seg, index, projectId, last 
           <IconButton title="Merge with next" disabled={last} onClick={() => act(() => api.merge(projectId, seg.id))}>
             <Combine className="size-3.5" />
           </IconButton>
-          <IconButton title="Delete segment" onClick={() => confirm('Delete this segment?') && act(() => api.deleteSegment(projectId, seg.id))}>
+          <IconButton
+            title="Delete segment"
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Delete this segment?',
+                message: 'Its text, translation and generated voice clip are removed. The surrounding segments and the original audio stay as they are.',
+                confirmLabel: 'Delete segment',
+                tone: 'danger',
+              })
+              if (ok) act(() => api.deleteSegment(projectId, seg.id))
+            }}
+          >
             <Trash2 className="size-3.5" />
           </IconButton>
         </div>

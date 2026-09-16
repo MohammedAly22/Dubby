@@ -9,6 +9,21 @@ export interface Toast {
   message: string
 }
 
+/** Options for the studio's own confirmation dialog (never window.confirm). */
+export interface ConfirmOptions {
+  title: string
+  message?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  tone?: 'default' | 'danger'
+  icon?: string
+}
+
+export interface ConfirmRequest extends ConfirmOptions {
+  id: number
+  resolve: (ok: boolean) => void
+}
+
 interface StudioState {
   connected: boolean
   backendReachable: boolean
@@ -27,6 +42,7 @@ interface StudioState {
   clipDraft: { start: number | null; end: number | null }
   logsOpen: boolean
   settingsOpen: boolean
+  confirmRequest: ConfirmRequest | null
 
   connect: () => void
   loadProjects: (silent?: boolean) => Promise<void>
@@ -35,6 +51,8 @@ interface StudioState {
   loadEngines: (refresh?: boolean) => Promise<void>
   toast: (message: string, kind?: Toast['kind']) => void
   dismiss: (id: number) => void
+  confirm: (options: ConfirmOptions) => Promise<boolean>
+  resolveConfirm: (ok: boolean) => void
   select: (id: string | null) => void
   setClipDraft: (draft: Partial<{ start: number | null; end: number | null }>) => void
   setLogsOpen: (open: boolean) => void
@@ -105,6 +123,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   jobs: null,
   logs: [],
   toasts: [],
+  confirmRequest: null,
   asrPreview: null,
   selectedId: null,
   clipDraft: { start: null, end: null },
@@ -170,6 +189,17 @@ export const useStudio = create<StudioState>((set, get) => ({
     setTimeout(() => get().dismiss(id), kind === 'error' ? 7000 : 4000)
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  confirm: (options) =>
+    new Promise<boolean>((resolve) => {
+      get().confirmRequest?.resolve(false) // never leave an earlier question hanging
+      set({ confirmRequest: { ...options, id: ++toastId, resolve } })
+    }),
+  resolveConfirm: (ok) => {
+    const request = get().confirmRequest
+    if (!request) return
+    set({ confirmRequest: null })
+    request.resolve(ok)
+  },
   select: (id) => set({ selectedId: id }),
   setClipDraft: (draft) => set((s) => ({ clipDraft: { ...s.clipDraft, ...draft } })),
   setLogsOpen: (logsOpen) => set({ logsOpen }),
