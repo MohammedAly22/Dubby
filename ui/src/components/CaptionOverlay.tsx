@@ -83,7 +83,8 @@ export function CaptionOverlay({
   return (
     <div
       className="pointer-events-none absolute flex flex-col items-center justify-end"
-      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height, paddingLeft: px(S.side), paddingRight: px(S.side), paddingBottom: px(S.bottom), gap: px(S.gap) }}
+      // small players keep the lines above the browser's video controls (the export uses the exact offset)
+      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height, paddingLeft: px(S.side), paddingRight: px(S.side), paddingBottom: Math.max(S.bottom * s, S.controlsClearance), gap: px(S.gap) }}
     >
       {originalWords.length > 0 && (
         <div style={{ ...box('original', source), background: S.original.background, color: S.original.plain.color }}>

@@ -90,7 +90,7 @@ export function ProjectPage({ id }: { id: string }) {
           </div>
         </div>
 
-        <nav ref={container} className="relative flex overflow-x-auto rounded-full border border-line-strong bg-panel p-1 backdrop-blur-xl">
+        <nav ref={container} className="no-scrollbar relative flex overflow-x-auto rounded-full border border-line-strong bg-panel p-1 backdrop-blur-xl">
           <span
             aria-hidden
             className={cls(

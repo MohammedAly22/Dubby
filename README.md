@@ -1,5 +1,51 @@
 <div align="center">
 
+<img src="assets/banner.png" alt="Dubby — YouTube dubbing studio" width="100%" />
+
+<br />
+
+<a href="https://github.com/MohammedAly22/Dubby">
+  <img src="https://readme-typing-svg.demolab.com?font=Inter&weight=700&size=24&duration=2400&pause=900&color=9BD23C&center=true&vCenter=true&width=760&lines=Dub+any+YouTube+video+in+9+languages+%F0%9F%90%A8;%F0%9F%87%AA%F0%9F%87%AC+Egyptian+%C2%B7+%F0%9F%87%B8%F0%9F%87%A6+MSA+%C2%B7+%F0%9F%87%BA%F0%9F%87%B8+English;%F0%9F%87%AA%F0%9F%87%B8+Spanish+%C2%B7+%F0%9F%87%AB%F0%9F%87%B7+French+%C2%B7+%F0%9F%87%AE%F0%9F%87%B9+Italian;%F0%9F%87%AE%F0%9F%87%B3+Hindi+%C2%B7+%F0%9F%87%A8%F0%9F%87%B3+Chinese+%C2%B7+%F0%9F%87%AF%F0%9F%87%B5+Japanese;Detect+%C2%B7+Transcribe+%C2%B7+Translate+%C2%B7+Clone+%C2%B7+Mix" alt="Typing tagline" />
+</a>
+
+<p>
+  <b>A dubbing studio for YouTube videos.</b><br />
+  It detects the spoken language, recommends the best open models (or Google Gemini) for each language, gives you word-aligned transcripts and translations you can edit as they stream in, clones voices, and exports a timed dub with word-highlighted captions that you review at every step.
+</p>
+
+<p>
+  <a href="https://colab.research.google.com/github/MohammedAly22/Dubby/blob/main/notebooks/Dubby_Colab.ipynb"><img src="https://img.shields.io/badge/Open%20in-Colab-F4E03A?style=for-the-badge&logo=googlecolab&logoColor=black&labelColor=9BD23C" alt="Open in Colab" /></a>
+  <a href="#-installation"><img src="https://img.shields.io/badge/Run-Locally-9BD23C?style=for-the-badge&logo=anaconda&logoColor=white&labelColor=1a1f14" alt="Run locally" /></a>
+  <a href="#-languages--recommended-engines"><img src="https://img.shields.io/badge/Languages-9-F4E03A?style=for-the-badge&logo=googletranslate&logoColor=black&labelColor=1a1f14" alt="9 languages" /></a>
+  <a href="#-engines"><img src="https://img.shields.io/badge/Engines-28-9BD23C?style=for-the-badge&logo=huggingface&logoColor=black&labelColor=1a1f14" alt="28 engines" /></a>
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/python-3.10–3.13-9BD23C?style=flat-square&logo=python&logoColor=white&labelColor=1a1f14" alt="Python" />
+  <img src="https://img.shields.io/badge/PyTorch-2.8-9BD23C?style=flat-square&logo=pytorch&logoColor=white&labelColor=1a1f14" alt="PyTorch" />
+  <img src="https://img.shields.io/badge/FastAPI-backend-9BD23C?style=flat-square&logo=fastapi&logoColor=white&labelColor=1a1f14" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/React-18-F4E03A?style=flat-square&logo=react&logoColor=white&labelColor=1a1f14" alt="React" />
+  <img src="https://img.shields.io/badge/Tailwind-v4-F4E03A?style=flat-square&logo=tailwindcss&logoColor=white&labelColor=1a1f14" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/license-Apache--2.0-9BD23C?style=flat-square&labelColor=1a1f14" alt="License" />
+  <a href="https://github.com/MohammedAly22/Dubby/stargazers"><img src="https://img.shields.io/github/stars/MohammedAly22/Dubby?style=flat-square&color=F4E03A&labelColor=1a1f14&logo=github" alt="Stars" /></a>
+</p>
+
+<p>
+  <a href="#-languages--recommended-engines">Languages</a> ·
+  <a href="#-features">Features</a> ·
+  <a href="#-pipeline">Pipeline</a> ·
+  <a href="#-engines">Engines</a> ·
+  <a href="#-installation">Install</a> ·
+  <a href="#%EF%B8%8F-using-the-studio">Studio</a> ·
+  <a href="#-command-line">CLI</a> ·
+  <a href="#%EF%B8%8F-google-colab">Colab</a> ·
+  <a href="#%EF%B8%8F-architecture">Architecture</a> ·
+  <a href="#-troubleshooting">Troubleshooting</a> ·
+  <a href="#-contributing">Contributing</a>
+</p>
+
+</div>
+
 ---
 
 ## 🌍 Languages & recommended engines
@@ -29,15 +75,15 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
 
 ### 🔁 Translation recommendations
 
-| From → To                    | Ranked engines                                                          | Why                                                                                         |
-| :---------------------------- | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------ |
-| English/Arabic → Egyptian    | **Emhotob-50M** › Masrawy › Jisr › LLM › NLLB                 | Purpose-built Egyptian translators by oddadmix                                              |
-| English/Arabic → MSA         | **Emhotob-50M** › Hunyuan-MT › Jisr › NLLB › LLM              | Emhotob scores BLEU 46 on En→MSA                                                           |
-| English → Hindi              | **IndicTrans2** › Hunyuan-MT › NLLB › LLM                      | AI4Bharat's state-of-the-art English→Indic model                                           |
-|  Egyptian Arabic →  English  | **ArzEn-LLM** › LLM (4-bit) › NLLB (`arz_Arab`) › Hunyuan-MT | Llama-3-8B fine-tuned on code-switched Egyptian speech (BLEU 53.6); all four fit a 16 GB T4 |
-| Any →                        | **Hunyuan-MT-7B** › LLM › NLLB                                  | Hunyuan-MT won 30 of 31 WMT25 language pairs                                                |
-| Any →                        | **Hunyuan-MT-7B** › Qwen LLM › NLLB                             | Official Chinese prompt template; Qwen is also excellent for CJK                            |
-| Same language (e.g. en → en) | **Keep original text**                                            | Re-voice a video without translating                                                        |
+| From → To | Ranked engines | Why |
+| :-- | :-- | :-- |
+| English/Arabic → <img src="assets/egypt.jpg" width="16" /> Egyptian | **Emhotob-50M** › Masrawy › Jisr › LLM › NLLB | Purpose-built Egyptian translators by oddadmix |
+| English/Arabic → <img src="assets/KSA.jpg" width="16" /> MSA | **Emhotob-50M** › Hunyuan-MT › Jisr › NLLB › LLM | Emhotob scores BLEU 46 on En→MSA |
+| English → <img src="assets/India.png" width="16" /> Hindi | **IndicTrans2** › Hunyuan-MT › NLLB › LLM | AI4Bharat's state-of-the-art English→Indic model |
+| <img src="assets/egypt.jpg" width="16" /> Egyptian Arabic → <img src="assets/USA.jpg" width="16" /> English | **ArzEn-LLM** › LLM (4-bit) › NLLB (`arz_Arab`) › Hunyuan-MT | Llama-3-8B fine-tuned on code-switched Egyptian speech (BLEU 53.6); all four fit a 16 GB T4 |
+| Any → <img src="assets/Spain.png" width="16" /> <img src="assets/France.png" width="16" /> <img src="assets/Italy.png" width="16" /> <img src="assets/USA.jpg" width="16" /> | **Hunyuan-MT-7B** › LLM › NLLB | Hunyuan-MT won 30 of 31 WMT25 language pairs |
+| Any → <img src="assets/China.jpg" width="16" /> <img src="assets/Japan.png" width="16" /> | **Hunyuan-MT-7B** › Qwen LLM › NLLB | Official Chinese prompt template; Qwen is also excellent for CJK |
+| Same language (e.g. en → en) | **Keep original text** | Re-voice a video without translating |
 
 > [!NOTE]
 > **How the TTS rankings were chosen.** OmniVoice publishes its training hours per language. English, Chinese, Japanese, Spanish, French and Italian all have 9k–206k hours, so OmniVoice is the top pick there: it clones voices and can generate each clip to the exact segment length. Hindi has only **117 h**, so **IndicF5** (AI4Bharat) is recommended for Hindi. Egyptian and MSA use the Arabic fine-tunes **VoiceTut** and **Lahgtna**; MSA is produced by the same checkpoints through the `arb` language id.
@@ -89,7 +135,14 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
     <td colspan="2"><img src="assets/screenshots/project-dark.png" alt="Dubby project workspace" /></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><sub>🎬 Project workspace: player with subtitles, timeline with source and dub lanes, and one panel per stage</sub></td>
+    <td colspan="2" align="center"><sub>🎬 Project workspace: the rendered dub with word-highlighted captions, timeline with source and dub lanes, and one panel per stage</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/mobile-home.png" width="280" alt="Dubby home on a phone" /></td>
+    <td align="center"><img src="assets/screenshots/mobile-project.png" width="280" alt="Dubby project on a phone" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><sub>📱 On a phone: the whole studio works on small screens, and fullscreen keeps the captions</sub></td>
   </tr>
 </table>
 
@@ -137,13 +190,13 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
     </td>
     <td valign="top">
       <h4>🧠 Isolated model workers</h4>
-      Four engine families (core, qwen, nemo, indic), each in its own interpreter, so incompatible transformers versions coexist. Stopping a family frees its VRAM, and cancel kills its worker process.
+      Five engine families (core, qwen, nemo, indic and the CPU-only cloud family), each in its own interpreter, so incompatible transformers versions coexist. Stopping a family frees its VRAM, and cancel kills its worker process.
     </td>
   </tr>
   <tr>
     <td valign="top">
       <h4>🎨 Studio UI</h4>
-      Black & white UI with light and dark themes, an animated background, dropdowns with real flags, and a live logs drawer. It works on phones and tablets, and fullscreen keeps the captions.
+      Black & white UI with light and dark themes, an animated background, dropdowns with real flags, and a live logs drawer.
     </td>
     <td valign="top">
       <h4>📟 Readable terminal</h4>
@@ -182,6 +235,20 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
       Uploading a local video shows a progress bar with size, speed and time left, then <i>preparing for analysis</i> until the studio has the file.
     </td>
   </tr>
+  <tr>
+    <td valign="top">
+      <h4>🔷 Google Gemini, no GPU</h4>
+      Gemini transcription, context-aware translation and 30 preset TTS voices, all in parallel. Rate limits are waited out automatically, and when a model's daily quota runs out Dubby continues with the next Gemini model.
+    </td>
+    <td valign="top">
+      <h4>🔢 Speakable text</h4>
+      Per-language normalization turns numbers, dates, money, units, emails and URLs into words before TTS. Flip any clip between <i>Raw</i> and <i>Processed</i> to see exactly what the voice reads.
+    </td>
+    <td valign="top">
+      <h4>📱 Phones & fullscreen</h4>
+      Every page adapts to phones and tablets. Fullscreen takes the captions along, with an in-page fullscreen on iPhone, and captions scale with the picture just like in the exported video.
+    </td>
+  </tr>
 </table>
 
 ---
@@ -215,47 +282,46 @@ flowchart LR
 
 ### 🎙️ Speech recognition
 
-| Engine                             | ID                           | Family | Spoken languages        | Word timings                                       | Highlights                                                                      |
-| :--------------------------------- | :--------------------------- | :----: | :---------------------- | :------------------------------------------------- | :------------------------------------------------------------------------------ |
-| **WhisperX**                 | `whisperx`                 |  core  | en ar es fr it hi zh ja | wav2vec2 per language                              | Batched faster-whisper, plus a Kotoba-Whisper option for Japanese               |
-| **Qwen3-ASR**                | `qwen3-asr`                |  qwen  | en ar es fr it hi zh ja | Qwen3-ForcedAligner (en zh ja es fr it) / wav2vec2 | SOTA open ASR (1.7B / 0.6B)                                                     |
-| **NVIDIA Parakeet TDT**      | `parakeet`                 |  nemo  | en es fr it             | native                                             | Fastest ASR, 25 European languages                                              |
-| **Cohere Transcribe**        | `cohere-transcribe`        |  core  | en ar es fr it zh ja    | wav2vec2                                           | 🔒 gated · Open ASR leaderboard#1 at release                                   |
-| **Cohere Transcribe Arabic** | `cohere-transcribe-arabic` |  core  | ar en                   | wav2vec2                                           |  dialects + code-switching · 🔒                                                |
-| **CohereX**                  | `coherex`                  |  core  | ar en es fr it zh ja    | wav2vec2                                           | VAD → Cohere → alignment · 🔒                                                |
-| **QwenCleo-ASR**             | `qwencleo`                 |  qwen  | ar                      | wav2vec2                                           |  SOTA Egyptian + code-switching                                                 |
-| **Metro-ASR**                | `metro-asr`                |  core  | ar                      | wav2vec2                                           |  61.6M CTC, fast on CPU                                                         |
-| **Google Gemini (API)**      | `gemini-asr`               | cloud | all 8 spoken            | estimated or wav2vec2                              | Long audio cut at silences and transcribed in parallel; no GPU · 🔑 Gemini key |
-| **Whisper language ID**      | `whisper-langid`           |  core  | 99 languages            | —                                                 | Detects the spoken language                                                     |
+| Engine | ID | Family | Spoken languages | Word timings | Highlights |
+| :-- | :-- | :-: | :-- | :-- | :-- |
+| **WhisperX** | `whisperx` | core | en ar es fr it hi zh ja | wav2vec2 per language | Batched faster-whisper, plus a Kotoba-Whisper option for Japanese |
+| **Qwen3-ASR** | `qwen3-asr` | qwen | en ar es fr it hi zh ja | Qwen3-ForcedAligner (en zh ja es fr it) / wav2vec2 | SOTA open ASR (1.7B / 0.6B) |
+| **NVIDIA Parakeet TDT** | `parakeet` | nemo | en es fr it | native | Fastest ASR, 25 European languages |
+| **Cohere Transcribe** | `cohere-transcribe` | core | en ar es fr it zh ja | wav2vec2 | 🔒 gated · Open ASR leaderboard #1 at release |
+| **Cohere Transcribe Arabic** | `cohere-transcribe-arabic` | core | ar en | wav2vec2 | <img src="assets/egypt.jpg" width="16" /> dialects + code-switching · 🔒 |
+| **CohereX** | `coherex` | core | ar en es fr it zh ja | wav2vec2 | VAD → Cohere → alignment · 🔒 |
+| **QwenCleo-ASR** | `qwencleo` | qwen | ar | wav2vec2 | <img src="assets/egypt.jpg" width="16" /> SOTA Egyptian + code-switching |
+| **Metro-ASR** | `metro-asr` | core | ar | wav2vec2 | <img src="assets/egypt.jpg" width="16" /> 61.6M CTC, fast on CPU |
+| **Google Gemini (API)** | `gemini-asr` | cloud | all 8 spoken | estimated or wav2vec2 | Long audio cut at silences and transcribed in parallel; no GPU · 🔑 Gemini key |
+| **Whisper language ID** | `whisper-langid` | core | 99 languages | — | Detects the spoken language |
 
 ### 🌍 Translation
 
-| Engine                          | ID              | Family | Directions                       | Highlights                                                                                                                                                                                                                       |
-| :------------------------------ | :-------------- | :----: | :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ArzEn-LLM**             | `arzen-llm`   |  core  | ar (Egyptian) → en              | [Llama-3-8B DoRA](https://huggingface.co/ahmedheakl/arazn-llama3-english) for code-switched Egyptian speech ([paper](https://arxiv.org/abs/2406.18120)), 4-bit on a T4                                                             |
-| **Tencent Hunyuan-MT-7B** | `hunyuan-mt`  |  core  | any → en es fr it hi zh ja arb  | [WMT25 winner](https://huggingface.co/tencent/Hunyuan-MT-7B), official prompts; auto 4-bit on 16 GB GPUs                                                                                                                          |
-| **Meta NLLB-200**         | `nllb`        |  core  | any → all 9 (incl.`arz_Arab`) | [600M / 1.3B / 3.3B](https://huggingface.co/facebook/nllb-200-distilled-1.3B), fast batched, reads Egyptian (`arz_Arab`) input                                                                                                  |
-| **AI4Bharat IndicTrans2** | `indictrans2` | indic | en → hi                         | [SOTA English→Indic](https://huggingface.co/ai4bharat/indictrans2-en-indic-1B) · 🔒                                                                                                                                             |
-| **oddadmix Emhotob-50M**  | `emhotob`     |  core  | en/ar → arz · arb              | [Egyptian](https://huggingface.co/oddadmix/50M-Egyptian-Translation-v1) · [MSA](https://huggingface.co/oddadmix/50M-English-MSA-v1) · [MSA↔Egyptian](https://huggingface.co/oddadmix/50M-MSA-Egyptian-v1)                        |
-| **oddadmix Masrawy v2**   | `masrawy`     |  core  | en → arz                        | [chrF 66.7](https://huggingface.co/oddadmix/masrawy-english-arabic-translator-v2)                                                                                                                                                 |
-| **oddadmix Jisr-MT-50M**  | `jisr`        |  core  | en → arz · arb                 | [Multi-dialect Marian](https://huggingface.co/oddadmix/Jisr-MT-50M-AllDialects)                                                                                                                                                   |
-| **Instruct LLM**          | `llm`         |  core  | any → any                       | [unsloth 4-bit](https://huggingface.co/unsloth) Qwen3 / Qwen2.5 / Llama 3.1 / Gemma 3 (or any chat model), batched, context-aware; **editable system prompt, temperature and top-p**; keeps code-switched terms for the TTS |
+| Engine | ID | Family | Directions | Highlights |
+| :-- | :-- | :-: | :-- | :-- |
+| **ArzEn-LLM** | `arzen-llm` | core | ar (Egyptian) → en | [Llama-3-8B DoRA](https://huggingface.co/ahmedheakl/arazn-llama3-english) for code-switched Egyptian speech ([paper](https://arxiv.org/abs/2406.18120)), 4-bit on a T4 |
+| **Tencent Hunyuan-MT-7B** | `hunyuan-mt` | core | any → en es fr it hi zh ja arb | [WMT25 winner](https://huggingface.co/tencent/Hunyuan-MT-7B), official prompts; auto 4-bit on 16 GB GPUs |
+| **Meta NLLB-200** | `nllb` | core | any → all 9 (incl. `arz_Arab`) | [600M / 1.3B / 3.3B](https://huggingface.co/facebook/nllb-200-distilled-1.3B), fast batched, reads Egyptian (`arz_Arab`) input |
+| **AI4Bharat IndicTrans2** | `indictrans2` | indic | en → hi | [SOTA English→Indic](https://huggingface.co/ai4bharat/indictrans2-en-indic-1B) · 🔒 |
+| **oddadmix Emhotob-50M** | `emhotob` | core | en/ar → arz · arb | [Egyptian](https://huggingface.co/oddadmix/50M-Egyptian-Translation-v1) · [MSA](https://huggingface.co/oddadmix/50M-English-MSA-v1) · [MSA↔Egyptian](https://huggingface.co/oddadmix/50M-MSA-Egyptian-v1) |
+| **oddadmix Masrawy v2** | `masrawy` | core | en → arz | [chrF 66.7](https://huggingface.co/oddadmix/masrawy-english-arabic-translator-v2) |
+| **oddadmix Jisr-MT-50M** | `jisr` | core | en → arz · arb | [Multi-dialect Marian](https://huggingface.co/oddadmix/Jisr-MT-50M-AllDialects) |
+| **Instruct LLM** | `llm` | core | any → any | [unsloth 4-bit](https://huggingface.co/unsloth) Qwen3 / Qwen2.5 / Llama 3.1 / Gemma 3 (or any chat model), batched, context-aware; **editable system prompt, temperature and top-p**; keeps code-switched terms for the TTS |
+| **Google Gemini (API)** | `gemini-translate` | cloud | any → any | Context-aware batches sent in parallel, editable system prompt; **default translator while a Gemini key is set** · 🔑 |
+| **Keep original text** | `passthrough` | core | same language | Re-voice without translating |
 
 > [!TIP]
 > **Translating on a 16 GB T4 (free Colab).** Engines and options that can't fit your GPU are greyed out with the reason, and *Apply fix* switches to a configuration that fits. Large translators load in 4-bit automatically (*Quantization → Auto*). The LLM prompt is a template: `{source}`, `{target}`, `{style}` and `{code_switching}` are filled in for each language pair, and *Preview* shows the result.
-> | **Google Gemini (API)** | `gemini-translate` | cloud | any → any | Context-aware batches sent in parallel, editable system prompt; **default translator while a Gemini key is set** · 🔑 |
-> | **Keep original text** | `passthrough` | core | same language | Re-voice without translating |
 
 ### 🔊 Text-to-speech
 
-| Engine                         | ID                    | Family | Dub languages            | Duration control | Highlights                                                                                                                               |
-| :----------------------------- | :-------------------- | :----: | :----------------------- | :--------------: | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| **OmniVoice**            | `omnivoice`         |  core  | all 9                    |        ✅        | [646 languages](https://huggingface.co/k2-fsa/OmniVoice), zero-shot cloning                                                               |
-| **Qwen3-TTS**            | `qwen3-tts`         |  qwen  | en zh ja es fr it        | fitted at render | [Expressive cloning](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base), 1.7B / 0.6B                                                   |
-| **AI4Bharat IndicF5**    | `indicf5`           | indic | hi                       | fitted at render | [Natural Hindi cloning](https://huggingface.co/ai4bharat/IndicF5) · 🔒                                                                   |
-| **VoiceTut-TTS**         | `voicetut`          |  core  | all 9 (best: arz · arb) |        ✅        | [380 h of Egyptian podcasts](https://huggingface.co/mohammedaly22/VoiceTut-TTS), 17 studio voices, OmniVoice backbone for other languages |
-| **Lahgtna OmniVoice v2** | `lahgtna-omnivoice` |  core  | all 9 (best: arz · arb) |        ✅        | [13 Arabic dialects](https://huggingface.co/oddadmix/lahgtna-omnivoice-v2), diacritics-aware, OmniVoice backbone for other languages      |
-
+| Engine | ID | Family | Dub languages | Duration control | Highlights |
+| :-- | :-- | :-: | :-- | :-: | :-- |
+| **OmniVoice** | `omnivoice` | core | all 9 | ✅ | [646 languages](https://huggingface.co/k2-fsa/OmniVoice), zero-shot cloning |
+| **Qwen3-TTS** | `qwen3-tts` | qwen | en zh ja es fr it | fitted at render | [Expressive cloning](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base), 1.7B / 0.6B |
+| **AI4Bharat IndicF5** | `indicf5` | indic | hi | fitted at render | [Natural Hindi cloning](https://huggingface.co/ai4bharat/IndicF5) · 🔒 |
+| **VoiceTut-TTS** | `voicetut` | core | all 9 (best: arz · arb) | ✅ | [380 h of Egyptian podcasts](https://huggingface.co/mohammedaly22/VoiceTut-TTS), 17 studio voices, OmniVoice backbone for other languages |
+| **Lahgtna OmniVoice v2** | `lahgtna-omnivoice` | core | all 9 (best: arz · arb) | ✅ | [13 Arabic dialects](https://huggingface.co/oddadmix/lahgtna-omnivoice-v2), diacritics-aware, OmniVoice backbone for other languages |
 | **Google Gemini TTS (API)** | `gemini-tts` | cloud | all 9 | pace hint + fitted at render | 30 preset voices with previews, dialect-aware style prompt, clips generated in parallel, no reference voice · 🔑 |
 
 ### 🔷 Google Gemini engines
@@ -268,25 +334,26 @@ Add a Gemini API key ([get one](https://aistudio.google.com/apikey)) in **⚙️
 
 Gemini engines run in the CPU-only `cloud` family: starting them never unloads your local GPU models.
 
-**Rate limits and quotas.** Google limits every Gemini model separately, in requests per minute and per day, according to your project's usage tier. Credits pay for requests but don't raise these limits, and the preview TTS models have the lowest ones. Dubby handles a `429 RESOURCE_EXHAUSTED` for you:
-
-- **Per-minute limit:** every request to that model pauses for the delay Google asks for, parallel requests are halved, then grow back after successes.
-- **Daily limit:** waiting won't help, so Dubby continues with the next Gemini model of the same kind (for example 3.1 Flash TTS → 2.5 Flash TTS → 2.5 Pro TTS) and says so in the logs. Turn off *Switch model when a daily quota runs out* to stay on one model.
-
-Check your limits at [ai.dev/rate-limit](https://ai.dev/rate-limit), and raise the usage tier in Google AI Studio for higher ones.
+> [!IMPORTANT]
+> **Rate limits and quotas.** Google limits every Gemini model separately, in requests per minute and per day, according to your project's usage tier. Credits pay for requests but **don't raise these limits**, and the preview TTS models have the lowest ones. Dubby handles `429 RESOURCE_EXHAUSTED` for you:
+>
+> - **Per-minute limit:** every request to that model pauses for the delay Google asks for, and parallel requests are halved, then grow back after successes.
+> - **Daily limit:** waiting won't help, so Dubby continues with the next Gemini model of the same kind (e.g. 3.1 Flash TTS → 2.5 Flash TTS → 2.5 Pro TTS) and says so in the logs. Turn off *Switch model when a daily quota runs out* to stay on one model.
+>
+> Check your limits at [ai.dev/rate-limit](https://ai.dev/rate-limit), and raise the usage tier in Google AI Studio for higher ones.
 
 ### 🔢 Text normalization
 
 With **Normalize numbers & symbols** on (the default), the studio rewrites each line for the dub language **before** it reaches any TTS engine. It handles numbers, decimals, ordinals, money, percentages, units, dates, clock times, phone numbers, emails, URLs, @handles, #hashtags, abbreviations, symbols and acronyms. Engines never normalize again, so what you see is exactly what the voice reads: flip a clip to **Processed** to compare it with the **Raw** text, with rewritten words highlighted.
 
-| Dub language | Examples                                                                                                                                                                                                   |
-| :----------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|  Egyptian    | VoiceTut-TTS's rules**without diacritics**: `3:30` → تلاتة و نص · `01147450629` → زيرو حداشر، سبعه وأربعين… · your own tashkeel is kept                        |
-|  MSA         | Grammatical agreement:`3 ساعات` → ثلاث ساعات · `11 دقيقة` → إحدى عشرة دقيقة · `$1,250.50` → ألف ومئتان وخمسون دولارا وخمسون سنتا |
-|  English     | `May 5, 2024` → May fifth, twenty twenty-four · `1.5M` → one point five million · `No. 7` → number seven                                                                                        |
-|              | Gender and elision: veintiún años · soixante et onze · un million d'euros · un'ora · alle sedici meno un quarto                                                                                      |
-|  Hindi       | Indian numbering and clock:`1,00,000` → एक लाख · `10:30` → साढ़े दस बजे                                                                                                              |
-|              | `2公里` → 两公里 · `15%` → 百分之十五 · `2024年` → 二零二四年 · `時速60km/h` → 時速六十キロ                                                                                                 |
+| Dub language | Examples |
+| :-- | :-- |
+| <img src="assets/egypt.jpg" width="16" /> Egyptian | VoiceTut-TTS's rules **without diacritics**: `3:30` → تلاتة و نص · `01147450629` → زيرو حداشر، سبعه وأربعين… · your own tashkeel is kept |
+| <img src="assets/KSA.jpg" width="16" /> MSA | Grammatical agreement: `3 ساعات` → ثلاث ساعات · `11 دقيقة` → إحدى عشرة دقيقة · `$1,250.50` → ألف ومئتان وخمسون دولارا وخمسون سنتا |
+| <img src="assets/USA.jpg" width="16" /> English | `May 5, 2024` → May fifth, twenty twenty-four · `1.5M` → one point five million · `No. 7` → number seven |
+| <img src="assets/Spain.png" width="16" /> <img src="assets/France.png" width="16" /> <img src="assets/Italy.png" width="16" /> | Gender and elision: veintiún años · soixante et onze · un million d'euros · un'ora · alle sedici meno un quarto |
+| <img src="assets/India.png" width="16" /> Hindi | Indian numbering and clock: `1,00,000` → एक लाख · `10:30` → साढ़े दस बजे |
+| <img src="assets/China.jpg" width="16" /> <img src="assets/Japan.png" width="16" /> | `2公里` → 两公里 · `15%` → 百分之十五 · `2024年` → 二零二四年 · `時速60km/h` → 時速六十キロ |
 
 > [!IMPORTANT]
 > **Reference voice language matters.** Voice cloning copies the accent of the reference clip. For natural Spanish, Chinese and other dubs, use *From this video*, *Auto per segment* or an uploaded recording in the dub language. The built-in studio voices are Egyptian Arabic.
@@ -352,14 +419,16 @@ conda activate dubby
 dubby serve              # http://127.0.0.1:8765 opens automatically
 ```
 
-|              Step              | What you do                                                                                                                                                                                                                                                                                                                                              |
-| :----------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   **1 · ⬇️ Source**   | Paste a YouTube link (or upload a file, with a live upload progress bar). Leave the spoken language on**🌐 Auto-detect** and pick a dub language. After download, the detected language and its confidence appear, and the recommended engines are applied                                                                                         |
-| **2 · 🎙️ Transcribe** | The recommended engine is preselected (★ Top pick). Chunks stream in with word timings: click a word to seek, ✂️ split, and merge or delete                                                                                                                                                                                                           |
-|  **3 · 🌍 Translate**  | Rows fill in one by one while you edit. A*source edited* badge flags stale lines, and ↻ retranslates one line                                                                                                                                                                                                                                         |
-|    **4 · 🧬 Voice**    | *From this video* · *Auto per segment* · *Studio voice* · *Upload*. Clipped and uploaded references are **transcribed with the ASR engine you choose** to become the TTS reference text                                                                                                                                                 |
-|     **5 · 🔊 Dub**     | *Generate all* runs asynchronously. Listen as clips land, check the fit bar, fix lines (tashkeel bar for Arabic), ↻ regenerate, and use **Dub preview** on the video                                                                                                                                                                            |
-|    **6 · 🎬 Export**    | Set the mix (ducked original / music stem / silent, levels, max speed-up, subtitle tracks),**Render**, then pick **Captions in the video** (*None · Original · Dub · Both*) and download or **Export** to disk. The dub captions are word-aligned on the rendered voice track right after each render; *Re-align* runs it again |
+| Step | What you do |
+| :-: | :-- |
+| **1 · ⬇️ Source** | Paste a YouTube link (or upload a file, with a live upload progress bar). Leave the spoken language on **🌐 Auto-detect** and pick a dub language. After download, the detected language and its confidence appear, and the recommended engines are applied |
+| **2 · 🎙️ Transcribe** | The recommended engine is preselected (★ Top pick). Chunks stream in with word timings: click a word to seek, ✂️ split, and merge or delete |
+| **3 · 🌍 Translate** | Rows fill in one by one while you edit. A *source edited* badge flags stale lines, and ↻ retranslates one line |
+| **4 · 🧬 Voice** | *From this video* · *Auto per segment* · *Studio voice* · *Upload*. Clipped and uploaded references are **transcribed with the ASR engine you choose** to become the TTS reference text |
+| **5 · 🔊 Dub** | *Generate all* runs asynchronously. Listen as clips land, check the fit bar, fix lines (tashkeel bar for Arabic), ↻ regenerate, and use **Dub preview** on the video |
+| **6 · 🎬 Export** | Set the mix (ducked original / music stem / silent, levels, max speed-up, subtitle tracks), **Render**, then pick **Captions in the video** (*None · Original · Dub · Both*) and download or **Export** to disk. The dub captions are word-aligned on the rendered voice track right after each render; *Re-align* runs it again |
+
+The player's **⛶ fullscreen** button (or a double-click on the video) takes the captions along, and the captions scale with the picture exactly like in the exported video.
 
 Every action also streams to the **terminal** and the **📟 Logs** drawer. Its **Requests** tab counts every request by status and kind (VAD, ASR, translation, TTS, alignment, model loads, renders, exports), shows what is running right now with a live timer, and expands a row for its error and details.
 
@@ -403,14 +472,15 @@ dubby dub "URL" --target es --captions both --export ~/Videos/Dubbed
 
 ## ☁️ Google Colab
 
-<a href="https://colab.research.google.com/github/MohammedAly22/Dubby/blob/main/notebooks/Dubby_Colab.ipynb"></a>
+<a href="https://colab.research.google.com/github/MohammedAly22/Dubby/blob/main/notebooks/Dubby_Colab.ipynb"><img src="https://img.shields.io/badge/Open%20the%20notebook%20in-Google%20Colab-F4E03A?style=for-the-badge&logo=googlecolab&logoColor=black&labelColor=9BD23C" alt="Open in Colab" /></a>
 
 Run [`notebooks/Dubby_Colab.ipynb`](notebooks/Dubby_Colab.ipynb) cell by cell:
 
-`0 helpers` → `1 GPU` → `2 clone` → `3 Node.js 22` → `4 core venv` → `5 qwen / nemo / indic venvs` → `6 HF token` → `7 build UI + doctor + languages` → `🚀 launch`
+`0 helpers` → `1 GPU` → `2 clone` → `3 Node.js 22 + system tools` → `4 core venv` → `5 qwen / nemo / indic venvs` → `6 HF token` → `🔷 Gemini key (optional)` → `7 build UI + doctor + languages` → `🚀 launch`
 
 * Dubby installs with **`uv` into isolated Python 3.12 venvs** under `/content/envs`, so Colab's own Python 3.13 packages never conflict with it.
 * Every install step **stops with the real error**. You never see a ✅ on a failed install, and the venv's `dubby` is added to `PATH` for later cells.
+* The HF token and Gemini key you paste in the notebook are **saved to the studio settings** (shown masked in ⚙️ Settings), so you enter them once.
 * The launch cell gives you a **Colab proxy** or **Cloudflare tunnel** link. Another cell tails the studio terminal, and you can export straight to Google Drive.
 
 ---
@@ -419,13 +489,14 @@ Run [`notebooks/Dubby_Colab.ipynb`](notebooks/Dubby_Colab.ipynb) cell by cell:
 
 Settings live in `~/Dubby/settings.json` and can be edited in the UI. Environment variables override them:
 
-| Variable                                                      | Meaning                                               |
-| :------------------------------------------------------------ | :---------------------------------------------------- |
-| `DUBBY_HOME`                                                | Projects, cache and exports root (default`~/Dubby`) |
-| `DUBBY_HOST` · `DUBBY_PORT`                              | Server bind address                                   |
-| `DUBBY_DEVICE`                                              | `auto` · `cuda` · `cpu`                       |
-| `DUBBY_PYTHON_CORE` · `_QWEN` · `_NEMO` · `_INDIC` | Interpreter per engine family                         |
-| `HF_TOKEN`                                                  | Hugging Face token passed to workers                  |
+| Variable | Meaning |
+| :-- | :-- |
+| `DUBBY_HOME` | Projects, cache and exports root (default `~/Dubby`) |
+| `DUBBY_HOST` · `DUBBY_PORT` | Server bind address |
+| `DUBBY_DEVICE` | `auto` · `cuda` · `cpu` |
+| `DUBBY_PYTHON_CORE` · `_QWEN` · `_NEMO` · `_INDIC` | Interpreter per engine family |
+| `HF_TOKEN` | Hugging Face token passed to workers |
+| `GEMINI_API_KEY` · `GOOGLE_API_KEY` | Gemini API key for the cloud engines (or save one with `dubby gemini-key`) |
 
 ### ▶️ YouTube downloads on Colab & cloud machines (no sign-in)
 
@@ -444,8 +515,9 @@ Cloud IPs (Colab, VMs) are often answered with *"Sign in to confirm you're not a
 
 ```
 dubby/
-├── cli.py                 # rich CLI: serve · dev · dub · languages · doctor · engines · projects · build-ui
-├── config.py              # settings + per-family interpreter discovery (core · qwen · nemo · indic)
+├── cli.py                 # rich CLI: serve · dev · dub · languages · doctor · engines · projects · build-ui · gemini-key
+├── config.py              # settings + per-family interpreter discovery (core · qwen · nemo · indic · cloud)
+├── errors.py              # turns failures (OOM, gated models, quotas…) into a message + next step
 ├── languages.py           # language registry: ISO / OmniVoice / NLLB / Qwen ids, scripts, OmniVoice hours
 ├── recommend.py           # ranked engine recommendations per stage and language pair
 ├── schemas.py             # Project / Segment / Word / TTSState … (pydantic, shared with the UI)
@@ -453,22 +525,25 @@ dubby/
 │   ├── studio.py          # orchestration: detection, stages, edits, voices, render, export
 │   ├── jobs.py            # GPU job queue + worker process manager (+ doctor runner)
 │   ├── storage.py         # atomic project.json store with debounced autosave
-│   ├── events.py          # thread-safe bus → terminal reporter + websockets
+│   ├── events.py          # thread-safe bus → terminal reporter + websockets + request tracking
 │   ├── reporter.py        # rich terminal output
 │   └── voices.py          # preset voices, reference clip cutting
-├── workers/               # JSON-lines protocol · worker loop (asr · asr_ref · langid · translation · tts) · doctor
+├── workers/               # JSON-lines protocol · worker loop (asr · asr_ref · langid · translation · tts · align) · doctor
 ├── engines/
-│   ├── asr/               # whisperx · qwen (Qwen3 + QwenCleo) · cohere · coherex · parakeet · metro · common
-│   ├── translation/       # hunyuan · nllb · indictrans2 · emhotob · masrawy · jisr · llm · passthrough
-│   ├── tts/               # omnivoice_base · omnivoice · qwen3_tts · indicf5 · voicetut · lahgtna
+│   ├── asr/               # whisperx · qwen (Qwen3 + QwenCleo) · cohere · coherex · parakeet · metro · gemini · common
+│   ├── translation/       # hunyuan · nllb · indictrans2 · emhotob · masrawy · jisr · llm · arzen · gemini · passthrough
+│   ├── tts/               # omnivoice_base · omnivoice · qwen3_tts · indicf5 · voicetut · lahgtna · gemini
+│   ├── align/             # caption_aligner (word timings of the rendered dub)
+│   ├── gemini_common.py   # Gemini client, rate-limit gate, daily-quota model fallback
 │   ├── langid/            # whisper_langid
 │   └── separation/        # demucs
-├── pipeline/              # chunking (script-aware) · render (mix + fit + mux) · subtitles
-├── media/                 # youtube (yt-dlp) · ffmpeg wrappers
+├── pipeline/              # chunking (script-aware) · render (mix + fit + mux) · subtitles · captions (burned-in, preview-identical)
+├── text/                  # per-language TTS text normalization (en es fr it arb arz hi zh ja)
+├── media/                 # youtube (yt-dlp) · PO tokens · ffmpeg wrappers · fonts (UI web fonts for captions)
 ├── server/app.py          # FastAPI REST + websocket + range-enabled media + SPA
 └── web/dist/              # built UI (from ui/)
 ui/                        # React + TypeScript + Tailwind v4 source
-assets/                    # banner, flags, screenshots
+assets/                    # banner, logo, flags, screenshots
 notebooks/Dubby_Colab.ipynb
 ```
 
@@ -508,27 +583,28 @@ class MyTTS(TTSEngine):
 
 ## 🩺 Troubleshooting
 
-| Symptom                                                                 | Fix                                                                                                                                                                                                         |
-| :---------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Engine shows**not installed**                                     | `dubby doctor` prints the exact `pip install …` for the right family interpreter                                                                                                                       |
-| **CUDA out of memory**                                            | Set*Quantization* to *Auto* or 4-bit, lower the batch size, or pick a smaller checkpoint. Dubby frees the failed model's memory, so the next run starts clean                                           |
-| Engine card greyed out:*needs 18 GB*                                  | It can't fit the detected GPU in any configuration. Pick another engine, or run on a bigger GPU (L4 / A100)                                                                                                 |
-| **Worker exited unexpectedly**                                    | Usually out of system RAM (code -9) or GPU memory. Use 4-bit or a smaller checkpoint (NLLB 600M, Qwen3-ASR 0.6B), and keep*exclusive GPU* on                                                              |
-| Model download seems stuck                                              | Open**Logs**: each file shows a progress bar with speed and ETA. Hugging Face xet downloads also show a short *reconstructing* phase                                                                |
+| Symptom | Fix |
+| :-- | :-- |
+| Engine shows **not installed** | `dubby doctor` prints the exact `pip install …` for the right family interpreter |
+| **CUDA out of memory** | Set *Quantization* to *Auto* or 4-bit, lower the batch size, or pick a smaller checkpoint. Dubby frees the failed model's memory, so the next run starts clean |
+| Engine card greyed out: *needs 18 GB* | It can't fit the detected GPU in any configuration. Pick another engine, or run on a bigger GPU (L4 / A100) |
+| **Worker exited unexpectedly** | Usually out of system RAM (code -9) or GPU memory. Use 4-bit or a smaller checkpoint (NLLB 600M, Qwen3-ASR 0.6B), and keep *exclusive GPU* on |
+| Model download seems stuck | Open **Logs**: each file shows a progress bar with speed and ETA. Hugging Face xet downloads also show a short *reconstructing* phase |
 | 401/403 on Cohere, IndicF5 or IndicTrans2 | Accept the model terms on Hugging Face and add your token in Settings |
-| Gemini `429 RESOURCE_EXHAUSTED` although you have credits | Per-model limits come from your usage tier, not your balance. Dubby waits out per-minute limits and switches model when a daily quota runs out; see [ai.dev/rate-limit](https://ai.dev/rate-limit) |
-| Wrong spoken language detected                                          | Pick it manually in the Source step. The engines re-pick automatically                                                                                                                                      |
-| Dub has a foreign accent                                                | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice                                                                                                        |
-| Weak Hindi pronunciation                                                | Use IndicF5 (indic family) instead of OmniVoice, which has only 117 h of Hindi                                                                                                                              |
-| Colab:`dubby: command not found`                                      | Re-run step 4. It installs into`/content/envs/dubby` and adds it to `PATH`, and it stops with the real error if the install fails                                                                       |
-| *Sign in to confirm you're not a bot* / *blocked by YouTube*        | Handled automatically ([see above](#️-youtube-downloads-on-colab--cloud-machines-no-sign-in)) — if every strategy fails, drop the video file on the Source step, or restart the Colab runtime for a new IP |
-| `youtube token helper: not built` in `dubby doctor`                 | Run`dubby youtube-helper --check` (needs `node` ≥ 20, `npm` and `git`), and keep tooling current: `pip install -U "yt-dlp[default]" bgutil-ytdlp-pot-provider`                                   |
-| `Could not resolve host: github.com`                                  | Your network is blocking GitHub's DNS. Use another network or ask your admin                                                                                                                                |
-| Dev UI shows*backend not reachable*                                   | Start`dubby serve`, or run `dubby dev` to launch the backend and Vite together                                                                                                                          |
-| Burned captions use a different font | The first captioned export downloads the studio fonts from Google Fonts into `<DUBBY_HOME>/cache/fonts`. Offline, system fonts are used; connect once and export again |
-| Dub captions say*estimated*                                           | Word alignment needs the wav2vec2 model for the dub language (downloaded on first use). Press*Re-align* in the Export step, and check the **Requests** tab for the error                            |
-| Clips sound rushed                                                      | Lower*Max speed-up*, shorten the line, or raise *Max chunk*                                                                                                                                             |
-| Mispronounced names                                                     | Rephrase the line (for Arabic, add tashkeel with the diacritics bar) and regenerate it                                                                                                                      |
+| Gemini `429 RESOURCE_EXHAUSTED` although you have credits | Per-model limits come from your usage tier, not your balance. Dubby waits out per-minute limits and switches model when a daily quota runs out ([details](#-google-gemini-engines)); check [ai.dev/rate-limit](https://ai.dev/rate-limit) |
+| Wrong spoken language detected | Pick it manually in the Source step. The engines re-pick automatically |
+| Dub has a foreign accent | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice |
+| Weak Hindi pronunciation | Use IndicF5 (indic family) instead of OmniVoice, which has only 117 h of Hindi |
+| Colab: `dubby: command not found` | Re-run step 4. It installs into `/content/envs/dubby` and adds it to `PATH`, and it stops with the real error if the install fails |
+| *Sign in to confirm you're not a bot* / *blocked by YouTube* | Handled automatically ([see above](#️-youtube-downloads-on-colab--cloud-machines-no-sign-in)) — if every strategy fails, drop the video file on the Source step, or restart the Colab runtime for a new IP |
+| `youtube token helper: not built` in `dubby doctor` | Run `dubby youtube-helper --check` (needs `node` ≥ 20, `npm` and `git`), and keep tooling current: `pip install -U "yt-dlp[default]" bgutil-ytdlp-pot-provider` |
+| `Could not resolve host: github.com` | Your network is blocking GitHub's DNS. Use another network or ask your admin |
+| Dev UI shows *backend not reachable* | Start `dubby serve`, or run `dubby dev` to launch the backend and Vite together |
+| Burned captions use a different font | The first captioned export downloads the studio fonts from Google Fonts into `<DUBBY_HOME>/cache/fonts`. Offline, system fonts are used: connect once and export again |
+| Arabic or Hindi captions look disconnected | Pillow needs `libraqm` + `fribidi` for text shaping (`sudo apt-get install libraqm0 libfribidi0`; the Colab notebook installs them). `dubby doctor` shows *text shaping raqm* when it works |
+| Dub captions say *estimated* | Word alignment needs the wav2vec2 model for the dub language (downloaded on first use). Press *Re-align* in the Export step, and check the **Requests** tab for the error |
+| Clips sound rushed | Lower *Max speed-up*, shorten the line, or raise *Max chunk* |
+| Mispronounced names | Rephrase the line (for Arabic, add tashkeel with the diacritics bar) and regenerate it |
 
 ---
 
@@ -576,3 +652,11 @@ Each model keeps its own license. Check them before commercial use.
 > **Responsible use:** only dub content you have the rights to, get consent before cloning a real person's voice, and never use Dubby to impersonate or mislead.
 
 <div align="center">
+
+<br />
+
+<img src="ui/src/assets/logo.png" width="72" alt="Dubby logo" />
+
+<sub>Made with 💚 & 💛 for creators everywhere · <b>Dubby 🐨</b></sub>
+
+</div>

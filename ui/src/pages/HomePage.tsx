@@ -8,6 +8,7 @@ import { useStudio } from '../store'
 import type { ProjectSummary, SourceLanguage, TargetDialect } from '../types'
 import { cls, fmtDuration, timeAgo } from '../utils'
 import { UploadProgressCard, advance, startUpload, type UploadState } from '../components/UploadProgress'
+import logo from '../assets/logo.png'
 
 const PIPELINE = [
   ['download', 'Source'],
@@ -86,11 +87,15 @@ export function HomePage() {
         <div className="orb pointer-events-none absolute -top-40 -right-40 size-[480px] rounded-full bg-white/[.07] blur-3xl" />
         <div className="orb pointer-events-none absolute -bottom-52 left-10 size-[380px] rounded-full bg-white/[.04] blur-3xl" style={{ animationDelay: '-7s' }} />
         <div className="relative flex max-w-3xl flex-col gap-6">
-          <span className="flex w-fit items-center gap-2 rounded-full border border-line-strong bg-black px-3 py-1 text-xs text-neutral-400">
-            {(['us', 'eg', 'sa', 'es', 'fr', 'it', 'in', 'cn', 'jp'] as FlagCode[]).map((f) => (
-              <Flag key={f} code={f} size={10} />
-            ))}
-            <span className="ml-1">9 languages · ASR · Translation · Voice cloning · Mix</span>
+          <span className="flex w-fit max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-line-strong bg-black px-3 py-1 text-xs text-neutral-400">
+            <span className="flex items-center gap-1.5 sm:gap-2">
+              {(['us', 'eg', 'sa', 'es', 'fr', 'it', 'in', 'cn', 'jp'] as FlagCode[]).map((f) => (
+                <Flag key={f} code={f} size={10} />
+              ))}
+            </span>
+            <span className="whitespace-nowrap sm:ml-1">
+              9 languages<span className="hidden sm:inline"> · ASR · Translation · Voice cloning · Mix</span>
+            </span>
           </span>
           <h1 className="text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-6xl">
             Dub any YouTube video
@@ -184,7 +189,7 @@ function ProjectCard({ p, index, onDeleted }: { p: ProjectSummary; index: number
           <img src={p.source.thumbnail} alt="" className="size-full object-cover opacity-80 grayscale transition duration-700 group-hover:scale-[1.05] group-hover:opacity-100 group-hover:grayscale-0" />
         ) : (
           <div className="grain flex size-full items-center justify-center text-4xl">
-            <span className="float">🐨</span>
+            <img src={logo} alt="" className="float size-16 opacity-90" />
           </div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />

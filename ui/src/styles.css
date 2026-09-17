@@ -468,3 +468,11 @@ input[type='range'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* horizontally scrollable strips (step tabs) without a visible scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -38,6 +38,8 @@ export const CAPTION_STYLE = {
   dubLinger: 0.15,
   /** players narrower than this keep a readable size (the export always scales exactly) */
   minScale: 0.62,
+  /** px kept free for the browser's own video controls in the preview */
+  controlsClearance: 54,
 } as const
 
 const UNSPACED = new Set(['zh', 'ja'])

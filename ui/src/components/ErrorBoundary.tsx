@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { RefreshCw, RotateCcw } from 'lucide-react'
 import { Button } from './ui'
+import logo from '../assets/logo.png'
 
 interface Props {
   children: ReactNode
@@ -34,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="mx-auto max-w-xl px-4 py-16">
         <div className="scale-in rounded-2xl border border-line-strong bg-panel p-6 backdrop-blur-xl">
-          <div className="text-3xl">🐨</div>
+          <img src={logo} alt="Dubby" className="size-14" />
           <h2 className="mt-3 text-lg font-semibold">This view hit an unexpected error</h2>
           <p className="mt-1 text-sm text-neutral-400">Your project is safe — everything is saved by the studio. Try again, or reload the page.</p>
           <pre className="mt-4 max-h-40 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-black/40 p-3 font-mono text-[11px] text-neutral-400">{error.message}</pre>

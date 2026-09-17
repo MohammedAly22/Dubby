@@ -1,4 +1,5 @@
 import { CloudDownload, Loader2, Settings, SquareTerminal } from 'lucide-react'
+import logo from '../assets/logo.png'
 import { useStudio } from '../store'
 import { cls } from '../utils'
 import { ThemeToggle } from './ThemeToggle'
@@ -21,9 +22,13 @@ export function TopBar() {
     <header className="sticky top-0 z-40 border-b border-line bg-black/75 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
         <a href="#/" className="group flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-white text-lg leading-none transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-8deg]">
-            <span className="float inline-block">🐨</span>
-          </span>
+          <img
+            src={logo}
+            alt="Dubby"
+            width={34}
+            height={34}
+            className="size-[34px] shrink-0 drop-shadow-[0_2px_8px_rgba(155,210,60,.35)] transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-8deg]"
+          />
           <span className="text-[17px] font-bold tracking-tight">Dubby</span>
           <span className="hidden rounded-full border border-line-strong px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-neutral-500 sm:inline">studio</span>
         </a>
