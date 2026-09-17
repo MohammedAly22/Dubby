@@ -1,4 +1,4 @@
-"""Gemini rate limits: per-minute 429s are waited out, daily quotas switch model (no network)."""
+"""Gemini rate limits: per-minute 429s are waited out, a daily quota stops the run (no network)."""
 
 import threading
 import time
@@ -29,6 +29,7 @@ def rate_error(quota_id: str, retry: str = "0.2s", limit: str = "10") -> errors.
 def fresh_state(monkeypatch):
     G._gates.clear()
     G._exhausted.clear()
+    G._exhausted_info.clear()
     monkeypatch.setattr(G.random, "uniform", lambda a, b: 0.0)  # no jitter: keep the tests fast
     yield
     G.set_notifier(None)
@@ -62,29 +63,27 @@ def test_per_minute_limit_is_waited_out_and_concurrency_halved():
     assert G._gates["tts-a"].limit == 1 and len(notes) == 2 and "pausing" in notes[0]
 
 
-def test_daily_quota_raises_and_falls_back_to_next_model():
-    used, notes = [], []
-    G.set_notifier(notes.append)
+def test_daily_quota_stops_and_fails_fast_without_switching_model():
+    calls = {"n": 0}
 
-    def call(model):
-        used.append(model)
-        if model == "tts-a":
-            return G.with_retry(lambda: (_ for _ in ()).throw(rate_error("GenerateRequestsPerDayPerProjectPerModel")), model=model)
-        return f"audio from {model}"
-
-    assert G.with_fallback(["tts-a", "tts-b"], call) == "audio from tts-b"
-    assert G.exhausted("tts-a") and "Switching to tts-b" in notes[-1]
-    # later requests skip the exhausted model straight away
-    used.clear()
-    assert G.with_fallback(["tts-a", "tts-b"], call) == "audio from tts-b" and used == ["tts-b"]
-
-
-def test_all_models_exhausted_raises_explained_error():
-    def call(model):
-        return G.with_retry(lambda: (_ for _ in ()).throw(rate_error("GenerateRequestsPerDayPerProjectPerModel")), model=model)
+    def request():
+        calls["n"] += 1
+        raise rate_error("GenerateRequestsPerDayPerProjectPerModel", limit="100")
 
     with pytest.raises(G.QuotaExhausted) as caught:
-        G.with_fallback(["tts-a", "tts-b"], call)
+        G.with_retry(request, model="gemini-3.1-flash-tts-preview")
+    assert calls["n"] == 1 and G.exhausted("gemini-3.1-flash-tts-preview")
+    assert "limited to 100 requests per day" in str(caught.value)
+    # later calls in the same run don't hit the API again
+    with pytest.raises(G.QuotaExhausted):
+        G.with_retry(request, model="gemini-3.1-flash-tts-preview")
+    assert calls["n"] == 1
+    assert not hasattr(G, "with_fallback")
+
+
+def test_quota_error_is_explained():
+    with pytest.raises(G.QuotaExhausted) as caught:
+        G.with_retry(lambda: (_ for _ in ()).throw(rate_error("GenerateRequestsPerDayPerProjectPerModel")), model="tts-b")
     from dubby.errors import explain
 
     explained = explain(caught.value).text()

@@ -224,6 +224,15 @@ def create_app(studio: Studio) -> FastAPI:
         items = [e for e in studio.bus.logs if project_id is None or e.get("project_id") in (None, project_id)]
         return items[-limit:]
 
+    @app.get("/api/console")
+    async def console_lines(limit: int = 1000):
+        return list(studio.bus.console_lines)[-limit:]
+
+    @app.delete("/api/console")
+    async def clear_console():
+        studio.bus.console_lines.clear()
+        return {"ok": True}
+
     # ------------------------------------------------------------ voices
     @app.post("/api/settings/gemini")
     async def save_gemini_key(body: GeminiKeyBody):
@@ -393,6 +402,7 @@ def create_app(studio: Studio) -> FastAPI:
                 "jobs": studio.jobs.snapshot(),
                 "downloads": list(studio.bus.downloads.values()),
                 "requests": list(studio.bus.requests.values())[-500:],
+                "console": list(studio.bus.console_lines)[-1000:],
             })
             while not recv_task.done():
                 try:

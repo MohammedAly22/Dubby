@@ -11,7 +11,7 @@ from dubby import languages
 
 StageName = Literal["download", "langid", "asr", "translation", "voice", "tts", "separation", "render"]
 STAGES: List[str] = ["download", "langid", "asr", "translation", "voice", "tts", "separation", "render", "captions", "export"]
-StageStatus = Literal["idle", "queued", "running", "done", "error", "cancelled"]
+StageStatus = Literal["idle", "queued", "running", "done", "error", "cancelled", "paused"]  # paused: stopped by a quota, partial results kept
 
 
 class StageState(BaseModel):

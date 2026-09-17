@@ -1,4 +1,5 @@
-export type StageStatus = 'idle' | 'queued' | 'running' | 'done' | 'error' | 'cancelled'
+/** paused: stopped by an API quota, with the results so far kept */
+export type StageStatus = 'idle' | 'queued' | 'running' | 'done' | 'error' | 'cancelled' | 'paused'
 export type StageName = 'download' | 'asr' | 'translation' | 'voice' | 'tts' | 'separation' | 'render'
 /** Spoken language code: en · ar · es · fr · it · hi · zh · ja */
 export type SourceLanguage = string
@@ -314,4 +315,39 @@ export interface RequestEvent {
   duration?: number
   error?: string | null
   detail?: Record<string, unknown>
+}
+
+/** A span of terminal text: its colour name (rich) and weight */
+export interface ConsoleSpan {
+  t: string
+  c: string | null
+  b: boolean
+}
+
+/** One line of the studio terminal, mirrored into the Logs drawer */
+export interface ConsoleRecord {
+  type: 'console'
+  id: string
+  ts: number
+  kind: 'line' | 'rule' | 'panel' | 'table'
+  project_id?: string | null
+  tone?: string | null
+  spans?: ConsoleSpan[]
+  title?: string
+  lines?: ConsoleSpan[][]
+  columns?: string[]
+  rows?: string[][]
+}
+
+/** A Gemini daily quota stopped a stage */
+export interface QuotaEvent {
+  type: 'quota'
+  project_id: string
+  stage: string
+  model: string
+  limit?: string | null
+  generated: number
+  remaining: number
+  voiced_total: number
+  message: string
 }

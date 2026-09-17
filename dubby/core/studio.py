@@ -24,6 +24,7 @@ from dubby.errors import explain
 from dubby.config import ENGINE_FAMILIES, Settings, load_settings, save_settings
 from dubby.core import voices
 from dubby.core.events import EventBus
+from dubby.core.reporter import TerminalReporter
 from dubby.core.jobs import Job, JobHandlers, JobManager, run_doctor
 from dubby.core.storage import ProjectStore
 from dubby.engines.registry import all_infos, get_info
@@ -76,6 +77,8 @@ class Studio:
         self.settings = settings or load_settings()
         self.store = ProjectStore(self.settings.projects_dir)
         self.bus = EventBus()
+        # the terminal log, mirrored line by line into the UI's Logs drawer
+        self.bus.subscribe(TerminalReporter(echo=False, feed=self.bus.console))
         self.jobs = JobManager(self.settings, self.bus)
         self.pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="dubby-cpu")
         self._engine_status: Dict[str, Any] = {}
@@ -135,7 +138,7 @@ class Studio:
             status = changes.get("status")
             if status == "running" and st.status != "running":
                 st.started_at, st.finished_at, st.error = time.time(), None, None
-            if status in ("done", "error", "cancelled"):
+            if status in ("done", "error", "cancelled", "paused"):
                 st.finished_at = time.time()
             for key, value in changes.items():
                 setattr(st, key, value)
@@ -998,6 +1001,7 @@ class Studio:
                     s.tts.status, s.tts.error = "queued", None
         self.publish_project(project_id)
         done_count = {"n": 0, "failed": 0}
+        quota: Dict[str, Any] = {}
 
         def on_result(kind: str, data: Dict[str, Any]) -> None:
             with self.store.mutate(project_id, persist=False) as proj:
@@ -1010,6 +1014,18 @@ class Studio:
                             continue
                         seg.tts.status = "running"
                         changed.append((seg, proj.segments.index(seg)))
+                elif kind == "tts_quota":
+                    # the engine hit its daily quota: keep what was generated, park the rest as pending
+                    quota.update(data)
+                    changed = []
+                    for sid in data.get("paused", []):
+                        try:
+                            seg = proj.segment(sid)
+                        except KeyError:
+                            continue
+                        if seg.tts.status in ("queued", "running"):
+                            seg.tts.status = "done" if seg.tts.audio else "pending"
+                            changed.append((seg, proj.segments.index(seg)))
                 elif kind in ("segment_audio", "tts_error"):
                     try:
                         seg = proj.segment(data["id"])
@@ -1052,6 +1068,19 @@ class Studio:
 
         def on_done(_: Dict[str, Any]) -> None:
             self.store.flush_dirty()
+            if quota:
+                p_now = self.store.get(project_id)
+                voiced_total = sum(1 for s in p_now.segments if s.tts.status == "done")
+                remaining = len(quota.get("paused", []))
+                message = (f"{quota['message']} {done_count['n']} of {quota.get('total', len(items))} clips were generated in this run; "
+                           f"the other {remaining} are paused.")
+                self.set_stage(project_id, "tts", status="paused", progress=done_count["n"] / max(1, len(items)),
+                               message=f"Paused · daily Gemini quota · {done_count['n']}/{len(items)} clips", error=message)
+                self.bus.publish({"type": "quota", "project_id": project_id, "stage": "tts", "model": quota.get("model"),
+                                  "limit": quota.get("limit"), "generated": done_count["n"], "remaining": remaining,
+                                  "voiced_total": voiced_total, "message": message})
+                self.publish_project(project_id)
+                return
             msg = f"{done_count['n']} clips generated" + (f" · {done_count['failed']} failed" if done_count["failed"] else "")
             self.set_stage(project_id, "tts", status="done", progress=1.0, message=msg)
 
@@ -1282,7 +1311,7 @@ class Studio:
         time.sleep(poll)
         while True:
             st = self.store.get(project_id).stages.get(stage, StageState())
-            if st.status in ("done", "error", "cancelled", "idle"):
+            if st.status in ("done", "error", "cancelled", "paused", "idle"):
                 return st
             if timeout and time.time() - started > timeout:
                 raise TimeoutError(f"{stage} did not finish in {timeout}s")

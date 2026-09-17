@@ -238,7 +238,7 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
   <tr>
     <td valign="top">
       <h4>🔷 Google Gemini, no GPU</h4>
-      Gemini transcription, context-aware translation and 30 preset TTS voices, all in parallel. Rate limits are waited out automatically, and when a model's daily quota runs out Dubby continues with the next Gemini model.
+      Gemini transcription, context-aware translation and 30 preset TTS voices, all in parallel. Per-minute rate limits are waited out automatically. When the model's daily quota runs out, Dubby pauses, tells you the limit and offers to render with the clips generated so far.
     </td>
     <td valign="top">
       <h4>🔢 Speakable text</h4>
@@ -338,7 +338,7 @@ Gemini engines run in the CPU-only `cloud` family: starting them never unloads y
 > **Rate limits and quotas.** Google limits every Gemini model separately, in requests per minute and per day, according to your project's usage tier. Credits pay for requests but **don't raise these limits**, and the preview TTS models have the lowest ones. Dubby handles `429 RESOURCE_EXHAUSTED` for you:
 >
 > - **Per-minute limit:** every request to that model pauses for the delay Google asks for, and parallel requests are halved, then grow back after successes.
-> - **Daily limit:** waiting won't help, so Dubby continues with the next Gemini model of the same kind (e.g. 3.1 Flash TTS → 2.5 Flash TTS → 2.5 Pro TTS) and says so in the logs. Turn off *Switch model when a daily quota runs out* to stay on one model.
+> - **Daily limit:** Dubby stays on the model you chose. It stops sending requests, keeps every clip generated so far, marks the rest *pending* and pauses the stage with a message such as *“gemini-3.1-flash-tts-preview is limited to 100 requests per day on your Gemini plan”*. A dialog asks whether to **render the video now** with the clips you have. After the quota resets, press **Generate N pending** in the Dub step and render again. `dubby dub` asks the same question in the terminal.
 >
 > Check your limits at [ai.dev/rate-limit](https://ai.dev/rate-limit), and raise the usage tier in Google AI Studio for higher ones.
 
@@ -430,7 +430,7 @@ dubby serve              # http://127.0.0.1:8765 opens automatically
 
 The player's **⛶ fullscreen** button (or a double-click on the video) takes the captions along, and the captions scale with the picture exactly like in the exported video.
 
-Every action also streams to the **terminal** and the **📟 Logs** drawer. Its **Requests** tab counts every request by status and kind (VAD, ASR, translation, TTS, alignment, model loads, renders, exports), shows what is running right now with a live timer, and expands a row for its error and details.
+Every action also streams to the **terminal** and the **📟 Logs** drawer, which mirrors the terminal line for line with the same colours: stage headers, progress bars, one line per clip with its fit (green / yellow / red), ✅ finished, ⏸ paused and ❌ failed. Filter it to warnings or errors. Its **Requests** tab counts every request by status and kind (VAD, ASR, translation, TTS, alignment, model loads, renders, exports), shows what is running right now with a live timer, and expands a row for its error and details.
 
 ---
 
@@ -591,7 +591,7 @@ class MyTTS(TTSEngine):
 | **Worker exited unexpectedly** | Usually out of system RAM (code -9) or GPU memory. Use 4-bit or a smaller checkpoint (NLLB 600M, Qwen3-ASR 0.6B), and keep *exclusive GPU* on |
 | Model download seems stuck | Open **Logs**: each file shows a progress bar with speed and ETA. Hugging Face xet downloads also show a short *reconstructing* phase |
 | 401/403 on Cohere, IndicF5 or IndicTrans2 | Accept the model terms on Hugging Face and add your token in Settings |
-| Gemini `429 RESOURCE_EXHAUSTED` although you have credits | Per-model limits come from your usage tier, not your balance. Dubby waits out per-minute limits and switches model when a daily quota runs out ([details](#-google-gemini-engines)); check [ai.dev/rate-limit](https://ai.dev/rate-limit) |
+| Gemini `429 RESOURCE_EXHAUSTED` although you have credits | Per-model limits come from your usage tier, not your balance. Dubby waits out per-minute limits; when the daily quota runs out it pauses, keeps the clips so far and offers to render ([details](#-google-gemini-engines)); check [ai.dev/rate-limit](https://ai.dev/rate-limit) |
 | Wrong spoken language detected | Pick it manually in the Source step. The engines re-pick automatically |
 | Dub has a foreign accent | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice |
 | Weak Hindi pronunciation | Use IndicF5 (indic family) instead of OmniVoice, which has only 117 h of Hindi |

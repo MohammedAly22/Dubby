@@ -96,7 +96,6 @@ class GeminiTTSEngine(TTSEngine):
             ParamSpec("style", "Style instruction", "text", "", help="Empty = automatic for the dub language, e.g. “Say in natural Egyptian Arabic…”"),
             ParamSpec("pace_hint", "Aim for the slot length", "bool", True, help="Ask for a pace that fits each segment's duration"),
             ParamSpec("parallel", "Parallel requests", "number", 4, min=1, max=16, step=1, help="Lowered automatically while Gemini rate-limits the model"),
-            ParamSpec("auto_fallback", "Switch model when a daily quota runs out", "bool", True, help="Per-minute limits are waited out automatically; when a model's daily quota is used up, continue with the next Gemini model"),
             normalize_param(),
         ],
     )
@@ -116,25 +115,36 @@ class GeminiTTSEngine(TTSEngine):
         model = self.params.get("model") or G.TTS_MODELS[0][0]
         items = list(items)
         parallel = int(self.params.get("parallel") or 4)
-        models = G.fallback_models(model, G.TTS_MODELS) if self.params.get("auto_fallback", True) else [model]
         G.set_notifier(lambda message: ctx.log(message, "warning"))
         ctx.result("tts_running", {"ids": [it.id for it in items[:parallel]]})
-
-        def speak(name: str, item: TTSItem) -> Tuple[bytes, int]:
-            with track("tts", f"Gemini TTS · clip {item.id}", model=name, voice=voice, chars=len(item.text)):
-                return synthesize_pcm(self.client, name, voice, self._prompt(item, target))
+        # the daily quota ends the run: the remaining clips are paused, never sent to another model
+        stopped: Dict[str, Any] = {}
 
         def run(item: TTSItem) -> Optional[float]:
+            if stopped:
+                return None
             try:
-                pcm, rate = G.with_fallback(models, lambda name: speak(name, item))
+                with track("tts", f"Gemini TTS · clip {item.id}", model=model, voice=voice, chars=len(item.text)):
+                    pcm, rate = synthesize_pcm(self.client, model, voice, self._prompt(item, target))
                 return write_wav(item.out_path, pcm, rate)
+            except G.QuotaExhausted as exc:
+                stopped.setdefault("info", exc.info)
+                return None
             except Exception as exc:
                 ctx.result("tts_error", {"id": item.id, "error": f"{type(exc).__name__}: {exc}"[:500]})
                 return None
 
+        voiced = set()
         for item, duration in G.run_parallel(run, items, parallel):
             if duration is not None:
+                voiced.add(item.id)
                 yield item, duration
+        if stopped:
+            info = stopped["info"]
+            paused = [it.id for it in items if it.id not in voiced]
+            ctx.log(f"{G.quota_sentence(model, info)} Stopped with {len(voiced)} of {len(items)} clips generated.", "warning")
+            ctx.result("tts_quota", {"model": model, "limit": info.get("limit"), "quota_id": info.get("quota_id"),
+                                     "message": G.quota_sentence(model, info), "paused": paused, "voiced": len(voiced), "total": len(items)})
 
 
 def preview_voice(voice: str, language: str, out_path: str, key: str, model: Optional[str] = None) -> str:

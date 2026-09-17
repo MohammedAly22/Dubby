@@ -313,7 +313,17 @@ def cmd_dub(args: argparse.Namespace) -> None:
         else:
             studio.set_voice(project.id, {"mode": "auto"})
         studio.run_tts(project.id, args.tts, _params(args.tts_param))
-        check("tts")
+        st = studio.wait(project.id, "tts")
+        if st.status == "paused":  # a daily API quota stopped the run: offer to render what exists
+            from rich.prompt import Confirm
+
+            console.print(f"[yellow]⏸  {st.error}[/yellow]")
+            if not sys.stdin.isatty() or not Confirm.ask("Render the video with the clips generated so far?", default=True):
+                studio.shutdown()
+                console.print("[yellow]Stopped. Run `dubby serve` later and press “Generate pending” in the Dub step to finish.[/yellow]")
+                sys.exit(2)
+        else:
+            check("tts")
         studio.render(project.id)
         check("render")
         captions = getattr(args, "captions", "none") or "none"

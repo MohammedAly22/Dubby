@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowDownToLine, CheckCircle2, CloudDownload, Loader2, Trash2, X, XCircle } from 'lucide-react'
 import { api } from '../api'
+import { ConsoleView, type ConsoleFilter } from './ConsoleView'
 import { RequestsView } from './RequestsView'
 import { useStudio } from '../store'
 import type { DownloadEvent } from '../types'
 import { cls, fmtBytes } from '../utils'
 import { IconButton, Segmented } from './ui'
 
-type Level = 'all' | 'info' | 'warning' | 'error'
 type Tab = 'logs' | 'requests'
 
 const fmtEta = (s: number) =>
@@ -16,24 +16,13 @@ const fmtEta = (s: number) =>
 export function LogsDrawer() {
   const open = useStudio((s) => s.logsOpen)
   const setOpen = useStudio((s) => s.setLogsOpen)
-  const logs = useStudio((s) => s.logs)
-  const [level, setLevel] = useState<Level>('info')
+  const records = useStudio((s) => s.console)
+  const [level, setLevel] = useState<ConsoleFilter>('all')
   const [tab, setTab] = useState<Tab>('logs')
   const requests = useStudio((s) => s.requests)
   const requestCount = Object.keys(requests).length
   const running = useMemo(() => Object.values(requests).filter((r) => r.status === 'running').length, [requests])
   const [follow, setFollow] = useState(true)
-  const box = useRef<HTMLDivElement>(null)
-
-  const filtered = useMemo(() => {
-    const rank: Record<string, number> = { debug: 0, info: 1, warning: 2, error: 3 }
-    const min = level === 'all' ? 0 : rank[level]
-    return logs.filter((l) => (rank[l.level] ?? 1) >= min).slice(-800)
-  }, [logs, level])
-
-  useEffect(() => {
-    if (open && follow && box.current) box.current.scrollTop = box.current.scrollHeight
-  }, [filtered, open, follow])
 
   if (!open) return null
   return (
@@ -59,13 +48,12 @@ export function LogsDrawer() {
             ]}
           />
           {tab === 'logs' && (
-          <Segmented<Level>
+          <Segmented<ConsoleFilter>
             size="sm"
             value={level}
             onChange={setLevel}
             options={[
               { value: 'all', label: 'all' },
-              { value: 'info', label: 'info' },
               { value: 'warning', label: 'warnings' },
               { value: 'error', label: 'errors' },
             ]}
@@ -80,7 +68,7 @@ export function LogsDrawer() {
           )}
           <IconButton
             title={tab === 'logs' ? 'Clear logs' : 'Clear finished requests'}
-            onClick={() => (tab === 'logs' ? useStudio.setState({ logs: [] }) : api.clearRequests().catch(() => {}))}
+            onClick={() => (tab === 'logs' ? (useStudio.setState({ console: [], logs: [] }), api.clearConsole().catch(() => {})) : api.clearRequests().catch(() => {}))}
           >
             <Trash2 className="size-4" />
           </IconButton>
@@ -94,21 +82,7 @@ export function LogsDrawer() {
       ) : (
       <>
       <Downloads />
-      <div ref={box} className="flex-1 overflow-auto px-3 py-2 font-mono text-[11.5px] leading-5 sm:px-4">
-        {filtered.map((l, i) => (
-          <div key={i} className="flex flex-col whitespace-pre-wrap break-words py-0.5 sm:flex-row sm:gap-3 sm:py-0">
-            <span className="flex shrink-0 gap-3 sm:contents">
-              <span className="shrink-0 text-neutral-600">{new Date(l.ts * 1000).toLocaleTimeString()}</span>
-              <span className="truncate text-neutral-500 sm:w-28 sm:shrink-0">{l.source}</span>
-            </span>
-            <span className={cls(l.level === 'error' ? 'font-semibold text-white' : l.level === 'warning' ? 'text-neutral-200' : l.level === 'debug' ? 'text-neutral-600' : 'text-neutral-400')}>
-              {l.level === 'error' ? '✖ ' : l.level === 'warning' ? '▲ ' : ''}
-              {l.message}
-            </span>
-          </div>
-        ))}
-        {!filtered.length && <div className="py-6 text-neutral-600">No logs yet.</div>}
-      </div>
+      <ConsoleView records={records} filter={level} follow={follow} />
       </>
       )}
     </div>

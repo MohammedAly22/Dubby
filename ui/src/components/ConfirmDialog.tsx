@@ -44,7 +44,7 @@ export function ConfirmDialog() {
           <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-line-strong bg-raised text-xl">{icon}</div>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold">{title}</h2>
-            {message && <p className="mt-1.5 text-sm leading-relaxed text-neutral-400">{message}</p>}
+            {message && <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-line text-neutral-400">{message}</p>}
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-2">

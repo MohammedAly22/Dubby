@@ -23,6 +23,8 @@ class EventBus:
         # every tracked request (jobs, VAD, API calls, TTS batches, renders…), newest last
         self.requests: "OrderedDict[str, Event]" = OrderedDict()
         self.max_requests = 2000
+        # the terminal-style live log (stage rules, progress bars, clip lines) mirrored to the UI
+        self.console_lines: Deque[Event] = deque(maxlen=1500)
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
@@ -82,6 +84,10 @@ class EventBus:
                 self.requests.popitem(last=False)
         self.publish(dict(merged))
         return merged
+
+    def console(self, record: Event) -> None:
+        self.console_lines.append(record)
+        self.publish(record)
 
     def clear_requests(self) -> None:
         """Forget finished requests (running and queued ones stay visible)."""

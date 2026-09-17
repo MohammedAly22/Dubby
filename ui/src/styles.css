@@ -476,3 +476,26 @@ input[type='range'] {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* terminal colours in the Logs drawer (success / warning / error) */
+.con-green {
+  color: #4ade80;
+}
+.con-yellow {
+  color: #facc15;
+}
+.con-red {
+  color: #f87171;
+}
+.con-border-red {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+html.light .con-green {
+  color: #15803d;
+}
+html.light .con-yellow {
+  color: #a16207;
+}
+html.light .con-red {
+  color: #dc2626;
+}

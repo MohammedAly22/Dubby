@@ -11,6 +11,7 @@ const STATUS_TEXT: Record<string, string> = {
   done: 'Done',
   error: 'Failed',
   cancelled: 'Cancelled',
+  paused: 'Paused',
 }
 
 export function StageHeader({
@@ -57,6 +58,15 @@ export function StageHeader({
         </div>
       )}
       {st.status === 'done' && st.message && <div className="text-xs text-neutral-400">✓ {st.message}</div>}
+      {st.status === 'paused' && (
+        <div className="flex gap-2 rounded-xl border border-white/40 bg-white/[.04] p-3 text-sm text-neutral-200">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <div className="min-w-0 break-words text-xs leading-relaxed">
+            <div className="font-semibold text-white">{st.message}</div>
+            {st.error}
+          </div>
+        </div>
+      )}
       {st.status === 'error' && (
         <div className="flex gap-2 rounded-xl border border-neutral-700 bg-white/[.03] p-3 text-sm text-neutral-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />

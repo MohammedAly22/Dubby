@@ -101,7 +101,6 @@ class GeminiASREngine(ASREngine):
             ]),
             ParamSpec("chunk_seconds", "Chunk length (s)", "number", 240, min=30, max=600, step=30, help="Audio is cut at silences into chunks of this size"),
             ParamSpec("parallel", "Parallel requests", "number", 6, min=1, max=16, step=1, help="Chunks transcribed at the same time"),
-            ParamSpec("auto_fallback", "Switch model when a daily quota runs out", "bool", True, help="Per-minute limits are waited out automatically; when a model's daily quota is used up, continue with the next Gemini model"),
             ParamSpec("hint", "Names & terms", "text", "", help="Optional: names or jargon to spell correctly"),
         ],
     )
@@ -140,8 +139,7 @@ class GeminiASREngine(ASREngine):
             sf.write(buffer, audio[a:b], SR, format="FLAC")
             part = types.Part.from_bytes(data=buffer.getvalue(), mime_type="audio/flac")
             with track("asr", f"Gemini ASR · part {chunks.index(chunk) + 1}/{len(chunks)}", model=model, seconds=round(duration, 1)):
-                fallbacks = G.fallback_models(model, G.TEXT_MODELS) if self.params.get("auto_fallback", True) else []
-                response = G.generate(self.client, model, [part, prompt], config, fallbacks)
+                response = G.generate(self.client, model, [part, prompt], config)
             data = json.loads(response.text or "{}")
             out = []
             for seg in data.get("segments", []):

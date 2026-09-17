@@ -89,6 +89,7 @@ export const api = {
     return upload<Project>(`/projects/${id}/source/upload`, fd, onProgress)
   },
   requests: () => req<RequestEvent[]>('/requests'),
+  clearConsole: () => req<{ ok: boolean }>('/console', json('DELETE')),
   clearRequests: () => req<{ ok: boolean }>('/requests', json('DELETE')),
   alignCaptions: (id: string) => req<{ queued: boolean }>(`/projects/${id}/captions/align`, json('POST')),
   engines: (refresh = false) => req<{ engines: EngineInfo[]; families: Record<string, any>; gpu: GpuInfo | null }>(`/engines${refresh ? '?refresh=true' : ''}`),

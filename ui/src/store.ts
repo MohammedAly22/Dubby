@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { api, fileUrl, wsUrl, type RunBody } from './api'
 import { playPreview } from './player'
-import type { AsrPreviewSegment, DownloadEvent, EngineChoice, EngineInfo, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, RequestEvent, Segment } from './types'
+import type { AsrPreviewSegment, ConsoleRecord, DownloadEvent, EngineChoice, EngineInfo, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, RequestEvent, Segment } from './types'
 import { debounceByKey } from './utils'
 
 export interface Toast {
@@ -37,6 +37,8 @@ interface StudioState {
   families: Record<string, any>
   jobs: JobsSnapshot | null
   logs: LogEvent[]
+  /** the studio terminal, line by line */
+  console: ConsoleRecord[]
   toasts: Toast[]
   asrPreview: { projectId: string; segments: AsrPreviewSegment[] } | null
   selectedId: string | null
@@ -133,6 +135,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   families: {},
   jobs: null,
   logs: [],
+  console: [],
   toasts: [],
   confirmRequest: null,
   downloads: {},
@@ -350,7 +353,7 @@ const forProject = (map: Map<string, number>, projectId: string) => [...map.keys
 
 function notifyStage(e: any, previous: string | undefined) {
   const status: string = e.state.status
-  if (previous === status || (status !== 'done' && status !== 'error' && status !== 'cancelled')) return
+  if (previous === status || (status !== 'done' && status !== 'error' && status !== 'cancelled')) return // paused: the quota dialog explains it
   const pendingMap = e.stage === 'tts' ? pendingClips : e.stage === 'translation' ? pendingLines : null
   const pending = pendingMap ? forProject(pendingMap, e.project_id) : []
   if (status === 'cancelled') {
@@ -429,6 +432,7 @@ function handleEvent(e: any) {
         jobs: e.jobs,
         downloads: Object.fromEntries(((e.downloads ?? []) as DownloadEvent[]).map((d) => [d.id, d])),
         requests: Object.fromEntries(((e.requests ?? []) as RequestEvent[]).map((r) => [r.id, r])),
+        console: (e.console ?? []) as ConsoleRecord[],
       })
       break
     case 'request':
@@ -488,11 +492,43 @@ function handleEvent(e: any) {
     case 'log':
       useStudio.setState((s) => ({ logs: s.logs.length > 1500 ? [...s.logs.slice(-1000), e] : [...s.logs, e] }))
       break
+    case 'console':
+      useStudio.setState((s) => ({ console: s.console.length >= 1500 ? [...s.console.slice(-1200), e as ConsoleRecord] : [...s.console, e as ConsoleRecord] }))
+      break
+    case 'quota':
+      offerRenderAfterQuota(e)
+      break
     case 'engines':
       state.loadEngines(false)
       break
     case 'export':
       state.toast(`📦 Exported ${e.items.length} files to disk`, 'success')
       break
+  }
+}
+
+/** A Gemini daily quota paused voice generation: say why, and offer to render what exists. */
+async function offerRenderAfterQuota(e: any) {
+  const s = useStudio.getState()
+  const title = s.project?.id === e.project_id ? null : s.projects.find((p) => p.id === e.project_id)?.title
+  const clips = Number(e.voiced_total ?? e.generated ?? 0)
+  if (!clips) {
+    s.toast(`⏸ Voice generation paused${title ? ` · ${title}` : ''}: ${e.message}`, 'error')
+    return
+  }
+  const ok = await s.confirm({
+    title: 'Gemini daily limit reached',
+    message: `${e.message}\n\nRender the video now with the ${clips} clip${clips === 1 ? '' : 's'} generated so far? Lines without a clip keep the original audio. You can press “Generate ${e.remaining} pending” in the Dub step once the quota resets, then render again.`,
+    confirmLabel: `Render with ${clips} clip${clips === 1 ? '' : 's'}`,
+    cancelLabel: 'Not now',
+    icon: '⏸',
+  })
+  if (!ok) return
+  try {
+    const project = s.project?.id === e.project_id ? s.project : null
+    await api.render(e.project_id, project ? (project.settings.mix as unknown as Record<string, unknown>) : undefined)
+    s.toast('🎬 Rendering with the generated clips…', 'success')
+  } catch (err: any) {
+    s.toast(err.message, 'error')
   }
 }

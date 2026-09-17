@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react'
-import { Ban, CheckCircle2, Circle, Clock3, Loader2, X, XCircle } from 'lucide-react'
+import { Ban, CheckCircle2, Circle, Clock3, Loader2, PauseCircle, X, XCircle } from 'lucide-react'
 import type { StageStatus } from '../types'
 import { cls } from '../utils'
 
@@ -86,6 +86,8 @@ export function StatusIcon({ status, className }: { status: StageStatus | 'pendi
       return <XCircle className={cls(c, 'text-neutral-300')} />
     case 'cancelled':
       return <Ban className={cls(c, 'text-neutral-500')} />
+    case 'paused':
+      return <PauseCircle className={cls(c, 'text-neutral-200')} />
     default:
       return <Circle className={cls(c, 'text-neutral-600')} />
   }
