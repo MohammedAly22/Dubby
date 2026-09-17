@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 
 class FFmpegError(RuntimeError):
@@ -17,6 +18,61 @@ def binary(name: str = "ffmpeg") -> str:
     path = shutil.which(name)
     if not path:
         raise FFmpegError(f"{name} not found on PATH. Install ffmpeg (conda install -c conda-forge ffmpeg).")
+    return path
+
+
+_filter_binaries: Dict[str, Optional[str]] = {}
+
+
+def _candidates() -> List[str]:
+    """Every ffmpeg we could use: the one first on PATH, others further down PATH, then the imageio-ffmpeg build."""
+    found: List[str] = []
+    first = shutil.which("ffmpeg")
+    if first:
+        found.append(first)
+    exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        path = Path(folder.strip('"')) / exe
+        if folder and path.is_file():
+            found.append(str(path))
+    try:
+        import imageio_ffmpeg
+
+        found.append(imageio_ffmpeg.get_ffmpeg_exe())
+    except Exception:
+        pass
+    unique: List[str] = []
+    for path in found:
+        key = os.path.normcase(os.path.realpath(path))
+        if key not in {os.path.normcase(os.path.realpath(u)) for u in unique}:
+            unique.append(path)
+    return unique
+
+
+def _has_filter(path: str, name: str) -> bool:
+    try:
+        proc = subprocess.run([path, "-hide_banner", "-filters"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return any(len(parts) > 1 and parts[1] == name for parts in (line.split() for line in proc.stdout.splitlines()))
+
+
+def binary_with_filter(name: str) -> Optional[str]:
+    """An ffmpeg that has filter ``name`` (e.g. ``ass``: conda-forge's Windows build ships without libass)."""
+    if name not in _filter_binaries:
+        _filter_binaries[name] = next((path for path in _candidates() if _has_filter(path, name)), None)
+    return _filter_binaries[name]
+
+
+def caption_binary() -> str:
+    """ffmpeg with libass, for burning captions; raises a plain explanation when none is installed."""
+    path = binary_with_filter("ass")
+    if not path:
+        raise FFmpegError(
+            "Burning captions needs ffmpeg with libass (the 'ass' filter), and the ffmpeg found here was built without it. "
+            "Fix: pip install imageio-ffmpeg (bundles an ffmpeg with libass), or install a full ffmpeg build "
+            "(Windows: choco install ffmpeg · Linux: apt-get install ffmpeg), then export again."
+        )
     return path
 
 
@@ -51,9 +107,10 @@ def video_size(path: Path | str) -> Tuple[int, int]:
     return 1280, 720
 
 
-def run_with_progress(args: Sequence[str], total_seconds: float, progress: Callable[[float], None], cwd: Optional[Path | str] = None) -> None:
+def run_with_progress(args: Sequence[str], total_seconds: float, progress: Callable[[float], None], cwd: Optional[Path | str] = None,
+                      executable: Optional[str] = None) -> None:
     """Run ffmpeg, reporting 0..1 progress from its ``-progress`` stream."""
-    cmd = [binary(), "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats", *args]
+    cmd = [executable or binary(), "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats", *args]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", cwd=str(cwd) if cwd else None)
     assert proc.stdout is not None
     for line in proc.stdout:

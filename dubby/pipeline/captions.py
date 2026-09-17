@@ -179,6 +179,7 @@ def burn(project: Project, project_dir: Path, mode: str, progress: Callable[[flo
     if out.exists():
         progress(1.0, "Captioned video already up to date")
         return out
+    executable = ffmpeg.caption_binary()  # fail fast, with a fix, when no ffmpeg here has libass
     ass_name = f"captions-{mode}-{digest}.ass"
     (out_dir / ass_name).write_text(ass, encoding="utf-8")
     total = ffmpeg.duration(video)
@@ -189,5 +190,6 @@ def burn(project: Project, project_dir: Path, mode: str, progress: Callable[[flo
         total,
         lambda v: progress(0.02 + 0.97 * v, f"Burning {mode} captions · {int(v * 100)}%"),
         cwd=out_dir,
+        executable=executable,
     )
     return out

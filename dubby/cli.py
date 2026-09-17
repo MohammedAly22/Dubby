@@ -135,7 +135,11 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     tools.add_column("path")
     for name, path in (("ffmpeg", shutil.which("ffmpeg")), ("ffprobe", shutil.which("ffprobe")), ("node", settings.resolved_node()), ("npm", shutil.which("npm"))):
         tools.add_row(name, Text(path or "missing", style="green" if path else "red"))
+    from dubby.media import ffmpeg as ff
     from dubby.media import pot
+
+    burner = ff.binary_with_filter("ass")
+    tools.add_row("caption burning (libass)", Text(burner or "missing — pip install imageio-ffmpeg", style="green" if burner else "yellow"))
 
     helper = pot.server_dir(settings)
     if pot.is_running():

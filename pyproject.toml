@@ -33,6 +33,7 @@ dependencies = [
     "bgutil-ytdlp-pot-provider>=2.0.0",
     "huggingface_hub>=0.30",
     "google-genai>=1.30",  # Gemini engines (cloud family) + key validation in the studio
+    "imageio-ffmpeg>=0.5",  # ffmpeg with libass for burned captions (conda-forge's Windows ffmpeg lacks it)
 ]
 
 [project.optional-dependencies]
