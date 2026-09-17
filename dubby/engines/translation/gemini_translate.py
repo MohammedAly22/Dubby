@@ -53,6 +53,7 @@ class GeminiTranslator(TranslationEngine):
             ParamSpec("temperature", "Temperature", "number", 0.3, min=0, max=1.5, step=0.05, help="0 = most literal and repeatable"),
             ParamSpec("batch_size", "Lines per request", "number", 25, min=1, max=100, step=1),
             ParamSpec("parallel", "Parallel requests", "number", 4, min=1, max=16, step=1),
+            ParamSpec("auto_fallback", "Switch model when a daily quota runs out", "bool", True, help="Per-minute limits are waited out automatically; when a model's daily quota is used up, continue with the next Gemini model"),
             ParamSpec("context_lines", "Context lines", "number", 8, min=0, max=40, step=1, help="Source lines before and after each batch shown as context"),
         ],
     )
@@ -85,12 +86,14 @@ class GeminiTranslator(TranslationEngine):
             thinking_config=G.thinking_off(model),
         )
         with track("translation", f"Gemini translate · {len(lines)} line{'s' if len(lines) != 1 else ''}", model=model, context=len(before) + len(after)):
-            response = G.generate(self.client, model, json.dumps(payload, ensure_ascii=False), config)
+            fallbacks = G.fallback_models(model, G.TEXT_MODELS) if self.params.get("auto_fallback", True) else []
+            response = G.generate(self.client, model, json.dumps(payload, ensure_ascii=False), config, fallbacks)
         data = json.loads(response.text or "{}")
         return {str(t.get("id")): str(t.get("text", "")) for t in data.get("translations", []) if str(t.get("text", "")).strip()}
 
     def translate(self, items: Sequence[Dict[str, Any]], source: str, target: str, ctx: TaskContext) -> Iterator[Tuple[str, str]]:
         items = list(items)
+        G.set_notifier(lambda message: ctx.log(message, "warning"))
         system = render_system_prompt(self.params.get("system_prompt"), source, target)
         size = max(1, int(self.params.get("batch_size") or 25))
         context = int(self.params.get("context_lines") or 0)

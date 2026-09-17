@@ -109,7 +109,7 @@ export function EnginePicker({
         </div>
       )}
 
-      <div className="stagger grid gap-2 sm:grid-cols-2">
+      <div className="stagger grid grid-cols-1 gap-2 sm:grid-cols-2">
         {engines.map(({ e, compatible, fits }, i) => {
           const active = e.id === choice.engine
           const r = rank.get(e.id)
@@ -131,7 +131,7 @@ export function EnginePicker({
               disabled={disabled || !compatible || (tooBig && !active)}
               onClick={() => onChange({ engine: e.id, params: e.id === choice.engine ? choice.params : { ...(r?.rec.params ?? {}) } })}
               className={cls(
-                'lift group flex flex-col gap-1.5 rounded-2xl border p-3 text-left',
+                'lift group flex min-w-0 flex-col gap-1.5 rounded-2xl border p-3 text-left',
                 active ? 'border-white bg-white/[.06]' : 'border-line bg-black/30 hover:border-neutral-600',
                 (!compatible || tooBig) && 'opacity-35',
               )}
@@ -160,9 +160,9 @@ export function EnginePicker({
               ) : (
                 r &&
                 compatible && (
-                  <span className="flex items-center gap-1 text-[11px] text-neutral-300">
-                    <Star className={cls('size-3', r.index === 0 && 'fill-current')} />
-                    {r.index === 0 ? 'Top pick' : `Recommended #${r.index + 1}`}
+                  <span className="flex min-w-0 items-center gap-1 text-[11px] text-neutral-300">
+                    <Star className={cls('size-3 shrink-0', r.index === 0 && 'fill-current')} />
+                    <span className="shrink-0 whitespace-nowrap">{r.index === 0 ? 'Top pick' : `Recommended #${r.index + 1}`}</span>
                     <span className="truncate text-neutral-500">· {r.rec.reason}</span>
                   </span>
                 )

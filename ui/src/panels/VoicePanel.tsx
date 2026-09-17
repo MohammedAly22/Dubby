@@ -74,7 +74,7 @@ export function VoicePanel({ project, onNext }: { project: Project; onNext: () =
         }
       />
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -155,7 +155,7 @@ function ReferenceTranscriber({ project }: { project: Project }) {
       <p className={cls('min-h-[2.5rem] rounded-xl border border-line bg-black/30 px-3 py-2 text-sm', !voice.ref_text && 'text-neutral-600')} dir="auto">
         {busy ? <span className="shimmer inline-block h-4 w-2/3 rounded" /> : voice.ref_text || 'No transcript yet.'}
       </p>
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <Field label="Reference language">
           <Select value={language} onChange={setLanguage} options={SOURCE_OPTIONS} menuWidth={260} />
         </Field>
@@ -197,7 +197,7 @@ function ClipEditor({ project, saving, apply }: { project: Project; saving: bool
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-line p-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Start">
           <div className="flex gap-2">
             <input type="number" step={0.05} className={cls(inputCls, 'font-mono')} value={clip.start ?? ''} onChange={(e) => setClip({ start: e.target.value === '' ? null : Number(e.target.value) })} />
@@ -280,7 +280,7 @@ function PresetPicker({ project, saving, apply }: { project: Project; saving: bo
           These studio voices speak Egyptian Arabic. Cloning them into {lang(project.settings.target).name} keeps an Arabic accent — prefer “From this video”, “Auto per segment” or an uploaded {lang(project.settings.target).name} recording.
         </div>
       )}
-      <div className="stagger grid gap-2 sm:grid-cols-3">
+      <div className="stagger grid grid-cols-1 gap-2 sm:grid-cols-3">
         {presets.map((p, i) => {
           const active = project.voice.mode === 'preset' && project.voice.preset === p.id
           return (

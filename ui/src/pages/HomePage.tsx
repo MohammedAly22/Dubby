@@ -126,7 +126,7 @@ export function HomePage() {
                   autoFocus
                 />
               </div>
-              <Button type="submit" variant="primary" size="lg" disabled={!url.trim() || !!uploading} loading={busy && !uploading} icon={!busy || uploading ?<ArrowRight className="size-4" /> : undefined}>
+              <Button type="submit" variant="primary" size="lg" disabled={!url.trim() || !!uploading} loading={busy && !uploading} icon={!busy || uploading ? <ArrowRight className="size-4" /> : undefined}>
                 Start dubbing
               </Button>
             </div>
@@ -157,7 +157,7 @@ export function HomePage() {
         {projects.length === 0 ? (
           <div className="fade-in rounded-2xl border border-dashed border-line-strong p-10 text-center text-sm text-neutral-500">No projects yet — your dubbed videos will show up here.</div>
         ) : (
-          <div className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((p, i) => (
               <ProjectCard key={p.id} p={p} index={i} onDeleted={loadProjects} />
             ))}

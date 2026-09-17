@@ -143,7 +143,7 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
   <tr>
     <td valign="top">
       <h4>🎨 Studio UI</h4>
-      Black & white UI with light and dark themes, an animated background, dropdowns with real flags, and a live logs drawer.
+      Black & white UI with light and dark themes, an animated background, dropdowns with real flags, and a live logs drawer. It works on phones and tablets, and fullscreen keeps the captions.
     </td>
     <td valign="top">
       <h4>📟 Readable terminal</h4>
@@ -171,7 +171,7 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
   <tr>
     <td valign="top">
       <h4>💬 Captions burned into the video</h4>
-      After a render, wav2vec2 aligns every word of the <b>dubbed</b> speech. Export with <i>original</i>, <i>dub</i>, <i>both</i> or no captions drawn on the frames, with the same per-word highlighting as the player (right-to-left scripts included).
+      After a render, wav2vec2 aligns every word of the <b>dubbed</b> speech. Export with <i>original</i>, <i>dub</i>, <i>both</i> or no captions. They look exactly like the player: the same fonts (Inter, IBM Plex Sans Arabic, Noto), boxes, glow, per-word highlighting and right-to-left layout.
     </td>
     <td valign="top">
       <h4>📡 Requests monitor</h4>
@@ -266,7 +266,14 @@ Add a Gemini API key ([get one](https://aistudio.google.com/apikey)) in **⚙️
 - **Translation:** batches of lines, each with the neighbouring lines as context, run in parallel. The system prompt is editable. While a key is set, Gemini is the default translator for new projects.
 - **Speech:** pick one of 30 preset voices in the Voice step (samples play in your dub language). All clips are generated concurrently.
 
-Gemini engines run in the CPU-only `cloud` family: starting them never unloads your local GPU models. Rate limits are retried automatically with backoff; lower *Parallel requests* if your quota is small.
+Gemini engines run in the CPU-only `cloud` family: starting them never unloads your local GPU models.
+
+**Rate limits and quotas.** Google limits every Gemini model separately, in requests per minute and per day, according to your project's usage tier. Credits pay for requests but don't raise these limits, and the preview TTS models have the lowest ones. Dubby handles a `429 RESOURCE_EXHAUSTED` for you:
+
+- **Per-minute limit:** every request to that model pauses for the delay Google asks for, parallel requests are halved, then grow back after successes.
+- **Daily limit:** waiting won't help, so Dubby continues with the next Gemini model of the same kind (for example 3.1 Flash TTS → 2.5 Flash TTS → 2.5 Pro TTS) and says so in the logs. Turn off *Switch model when a daily quota runs out* to stay on one model.
+
+Check your limits at [ai.dev/rate-limit](https://ai.dev/rate-limit), and raise the usage tier in Google AI Studio for higher ones.
 
 ### 🔢 Text normalization
 
@@ -508,7 +515,8 @@ class MyTTS(TTSEngine):
 | Engine card greyed out:*needs 18 GB*                                  | It can't fit the detected GPU in any configuration. Pick another engine, or run on a bigger GPU (L4 / A100)                                                                                                 |
 | **Worker exited unexpectedly**                                    | Usually out of system RAM (code -9) or GPU memory. Use 4-bit or a smaller checkpoint (NLLB 600M, Qwen3-ASR 0.6B), and keep*exclusive GPU* on                                                              |
 | Model download seems stuck                                              | Open**Logs**: each file shows a progress bar with speed and ETA. Hugging Face xet downloads also show a short *reconstructing* phase                                                                |
-| 401/403 on Cohere, IndicF5 or IndicTrans2                               | Accept the model terms on Hugging Face and add your token in Settings                                                                                                                                       |
+| 401/403 on Cohere, IndicF5 or IndicTrans2 | Accept the model terms on Hugging Face and add your token in Settings |
+| Gemini `429 RESOURCE_EXHAUSTED` although you have credits | Per-model limits come from your usage tier, not your balance. Dubby waits out per-minute limits and switches model when a daily quota runs out; see [ai.dev/rate-limit](https://ai.dev/rate-limit) |
 | Wrong spoken language detected                                          | Pick it manually in the Source step. The engines re-pick automatically                                                                                                                                      |
 | Dub has a foreign accent                                                | Use a reference voice in the dub language (clip, upload or auto) instead of an Egyptian studio voice                                                                                                        |
 | Weak Hindi pronunciation                                                | Use IndicF5 (indic family) instead of OmniVoice, which has only 117 h of Hindi                                                                                                                              |
@@ -517,7 +525,7 @@ class MyTTS(TTSEngine):
 | `youtube token helper: not built` in `dubby doctor`                 | Run`dubby youtube-helper --check` (needs `node` ≥ 20, `npm` and `git`), and keep tooling current: `pip install -U "yt-dlp[default]" bgutil-ytdlp-pot-provider`                                   |
 | `Could not resolve host: github.com`                                  | Your network is blocking GitHub's DNS. Use another network or ask your admin                                                                                                                                |
 | Dev UI shows*backend not reachable*                                   | Start`dubby serve`, or run `dubby dev` to launch the backend and Vite together                                                                                                                          |
-| Burned captions show empty boxes for Arabic, Hindi, Chinese or Japanese | Install the Noto fonts libass uses:`sudo apt-get install fonts-noto-core fonts-noto-cjk` (the Colab notebook does this)                                                                                   |
+| Burned captions use a different font | The first captioned export downloads the studio fonts from Google Fonts into `<DUBBY_HOME>/cache/fonts`. Offline, system fonts are used; connect once and export again |
 | Dub captions say*estimated*                                           | Word alignment needs the wav2vec2 model for the dub language (downloaded on first use). Press*Re-align* in the Export step, and check the **Requests** tab for the error                            |
 | Clips sound rushed                                                      | Lower*Max speed-up*, shorten the line, or raise *Max chunk*                                                                                                                                             |
 | Mispronounced names                                                     | Rephrase the line (for Arabic, add tashkeel with the diacritics bar) and regenerate it                                                                                                                      |

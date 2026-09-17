@@ -367,6 +367,7 @@ Most additions need **no UI code**:
 | a VRAM estimate | cards and options that can't fit the detected GPU are disabled with an explanation, and "Apply fix" switches to one that fits |
 | a recommendation | "★ Top pick", "Recommended #2" and *Use recommended* come from `recommend.py` |
 | progress / downloads | `ctx.progress()` drives the stage bar; Hugging Face downloads become progress bars in the logs automatically |
+| caption styling | the player overlay (`ui/src/captionStyle.ts`) and the export renderer (`STYLE` in `dubby/pipeline/captions.py`) share one spec in CSS px for a 760 px wide video. Change both together so exports keep matching the preview |
 | requests | every job and model load appears in **Logs → Requests** automatically. Wrap each API call, batch or pass inside a job with `with track("tts", f"My TTS · batch {i}", items=n):` (`from dubby.workers.protocol import track`) so it gets its own row, status and duration. Studio-side work uses `studio.track(...)` |
 
 Only **languages** need a UI edit (`Flags.tsx`, Recipe 3). After changing the UI, `dubby build-ui` refreshes the bundle that `dubby serve` uses, and `dubby dev` does it live.

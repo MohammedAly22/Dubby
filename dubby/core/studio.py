@@ -1235,8 +1235,9 @@ class Studio:
                 self._check_cancel(project_id, stage)
                 self.set_stage(project_id, stage, persist=False, progress=round(v * 0.95, 4), message=message)
 
-            with self.track(project_id, "export", f"Burn {captions} captions into the video", stage=stage, engine="ffmpeg libass"):
-                burned = caption_burn.burn(snapshot, self.store.dir(project_id), captions, progress)
+            with self.track(project_id, "export", f"Burn {captions} captions into the video", stage=stage, engine="Pillow + ffmpeg"):
+                burned = caption_burn.burn(snapshot, self.store.dir(project_id), captions, progress, fonts_dir=self.settings.cache_dir / "fonts",
+                                           log=lambda message: self.bus.log(message, "info", project_id, source="export"))
             rel = self.store.rel(project_id, burned)
             with self.store.mutate(project_id) as proj:
                 proj.render.burned = {**proj.render.burned, captions: rel}

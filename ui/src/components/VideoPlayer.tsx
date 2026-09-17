@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { Captions, Clapperboard, Film, Headphones } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Captions, Clapperboard, Film, Headphones, Maximize2, Minimize2 } from 'lucide-react'
 import { fileUrl } from '../api'
-import { isRtl } from './Flags'
+import { CaptionOverlay, type ContentRect } from './CaptionOverlay'
 import { usePlayer, type PlayerMode } from '../player'
 import type { Project } from '../types'
 import { cls, fmtTime, segmentIndexAt } from '../utils'
@@ -101,6 +101,116 @@ export function VideoPlayer({ project }: { project: Project }) {
     setMode(m)
   }
 
+  // ------------------------------------------------------------------ fullscreen
+  // The whole stage (video + caption overlay) goes fullscreen: a fullscreen <video> element would hide the captions.
+  const stage = useRef<HTMLDivElement>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [pseudoFullscreen, setPseudoFullscreen] = useState(false) // iPhone Safari: no element fullscreen API
+  const isFull = fullscreen || pseudoFullscreen
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = stage.current
+    if (!el) return
+    if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+      await (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.())?.catch?.(() => {})
+      return
+    }
+    if (pseudoFullscreen) return setPseudoFullscreen(false)
+    const request = el.requestFullscreen?.bind(el) ?? (el as any).webkitRequestFullscreen?.bind(el)
+    if (!request) return setPseudoFullscreen(true)
+    try {
+      await request({ navigationUI: 'hide' })
+      await (screen.orientation as any)?.lock?.('landscape').catch(() => {})
+    } catch {
+      setPseudoFullscreen(true)
+    }
+  }, [pseudoFullscreen])
+
+  useEffect(() => {
+    const sync = () => {
+      const active = document.fullscreenElement ?? (document as any).webkitFullscreenElement
+      setFullscreen(active === stage.current)
+      // a browser's own fullscreen button (Firefox) fullscreens the bare video: move the captions along
+      if (active && active === videoRef.current) {
+        document.exitFullscreen().then(() => stage.current?.requestFullscreen()).catch(() => setPseudoFullscreen(true))
+      }
+    }
+    document.addEventListener('fullscreenchange', sync)
+    document.addEventListener('webkitfullscreenchange', sync)
+    return () => {
+      document.removeEventListener('fullscreenchange', sync)
+      document.removeEventListener('webkitfullscreenchange', sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!pseudoFullscreen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPseudoFullscreen(false)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    // position: fixed is trapped by transformed / filtered ancestors and hidden behind their stacking contexts:
+    // neutralize those on the way up while the in-page fullscreen is open
+    const touched: { el: HTMLElement; css: string }[] = []
+    for (let el = stage.current?.parentElement; el && el !== document.body; el = el.parentElement) {
+      touched.push({ el, css: el.style.cssText })
+      el.style.setProperty('transform', 'none', 'important')
+      el.style.setProperty('filter', 'none', 'important')
+      el.style.setProperty('backdrop-filter', 'none', 'important')
+      el.style.setProperty('contain', 'none', 'important')
+      el.style.setProperty('will-change', 'auto', 'important')
+      el.style.setProperty('animation', 'none', 'important')
+      if (getComputedStyle(el).position === 'static') el.style.setProperty('position', 'relative', 'important')
+      el.style.setProperty('z-index', '2147483000', 'important')
+    }
+    return () => {
+      document.body.style.overflow = overflow
+      window.removeEventListener('keydown', onKey)
+      for (const { el, css } of touched) el.style.cssText = css
+    }
+  }, [pseudoFullscreen])
+
+  useEffect(() => {
+    // iOS plays fullscreen in its native player, which can't show our captions: use the in-page fullscreen instead
+    const v = videoRef.current as any
+    if (!v) return
+    const onNative = () => {
+      v.webkitExitFullscreen?.()
+      setPseudoFullscreen(true)
+    }
+    v.addEventListener('webkitbeginfullscreen', onNative)
+    return () => v.removeEventListener('webkitbeginfullscreen', onNative)
+  }, [src])
+
+  // where the picture sits inside the stage (letterboxing), so captions scale with the picture like in the export
+  const [rect, setRect] = useState<ContentRect>({ left: 0, top: 0, width: 0, height: 0 })
+  const measure = useCallback(() => {
+    const el = stage.current
+    const v = videoRef.current
+    if (!el) return
+    const cw = el.clientWidth
+    const ch = v?.clientHeight || el.clientHeight
+    const vw = v?.videoWidth || 16
+    const vh = v?.videoHeight || 9
+    const scale = Math.min(cw / vw, ch / vh)
+    const width = vw * scale
+    const height = vh * scale
+    const top = (v?.offsetTop ?? 0) + (ch - height) / 2
+    setRect((r) => {
+      const next = { left: (cw - width) / 2, top, width, height }
+      return Math.abs(r.width - next.width) < 0.5 && Math.abs(r.top - next.top) < 0.5 && Math.abs(r.left - next.left) < 0.5 ? r : next
+    })
+  }, [])
+  useEffect(() => {
+    const el = stage.current
+    if (!el) return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    if (videoRef.current) observer.observe(videoRef.current)
+    measure()
+    return () => observer.disconnect()
+  }, [measure, src, isFull])
+
   // ------------------------------------------------------------------ captions
   const idx = segmentIndexAt(project.segments, time)
   const seg = idx >= 0 ? project.segments[idx] : null
@@ -114,20 +224,30 @@ export function VideoPlayer({ project }: { project: Project }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="group relative overflow-hidden rounded-2xl border border-line bg-[#000]">
+      <div
+        ref={stage}
+        className={cls(
+          'group relative overflow-hidden bg-[#000]',
+          isFull ? 'flex h-full w-full items-center justify-center' : 'rounded-2xl border border-line',
+        )}
+        style={pseudoFullscreen ? { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100dvh', zIndex: 2147483001, borderRadius: 0 } : undefined}
+      >
         {src ? (
           <video
             key={src}
             ref={videoRef}
             src={src}
             controls
+            controlsList="nofullscreen"
             playsInline
             preload="metadata"
-            className="aspect-video w-full bg-[#000]"
+            className={cls('bg-[#000]', isFull ? 'h-full max-h-full w-full object-contain' : 'aspect-video w-full')}
+            onDoubleClick={toggleFullscreen}
             onLoadedMetadata={(e) => {
               if (resumeAt.current) e.currentTarget.currentTime = resumeAt.current
               usePlayer.setState({ duration: e.currentTarget.duration })
               usePlayer.getState().setVideo(e.currentTarget)
+              measure()
             }}
             onPlay={() => usePlayer.setState({ playing: true })}
             onPause={() => usePlayer.setState({ playing: false })}
@@ -138,42 +258,29 @@ export function VideoPlayer({ project }: { project: Project }) {
             <span className="relative">Preparing video…</span>
           </div>
         )}
-        {captions && (seg || dubSeg) && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-14 flex flex-col items-center gap-1 px-6">
-            {seg && effectiveMode !== 'dub' && (
-              <div className="max-w-[92%] rounded-lg bg-[#000]/75 px-3 py-1.5 text-center text-sm leading-relaxed text-[#fff] backdrop-blur" dir="auto">
-                {seg.words.length
-                  ? seg.words.map((w, i) => (
-                      <span key={i} className={cls('transition-colors', time >= w.start && time < w.end ? 'font-semibold text-[#c8ec6f]' : time >= w.end ? 'text-[#e5e5e5]' : 'text-[#8a8a8a]')}>
-                        {w.text}{' '}
-                      </span>
-                    ))
-                  : seg.text}
-              </div>
+        {captions && (
+          <CaptionOverlay
+            rect={rect}
+            time={time}
+            original={effectiveMode !== 'dub' ? seg : null}
+            dub={dubSeg}
+            dubWords={dubWords}
+            source={project.settings.source_language}
+            target={project.settings.target}
+          />
+        )}
+        {src && (
+          <button
+            type="button"
+            title={isFull ? 'Exit fullscreen (Esc)' : 'Fullscreen with captions'}
+            onClick={toggleFullscreen}
+            className={cls(
+              'absolute top-2 right-2 z-10 grid size-9 place-items-center rounded-full bg-[#000]/60 text-[#fff] backdrop-blur transition-opacity hover:bg-[#000]/80 focus-visible:opacity-100',
+              isFull ? 'opacity-70 hover:opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
             )}
-            {dubSeg?.translation && (
-              <div
-                dir="auto"
-                className={cls(
-                  'bg-accent-gradient max-w-[92%] rounded-lg px-3 py-1 text-center text-[15px] text-on-accent shadow-[0_6px_20px_-6px_rgba(155,210,60,.7)]',
-                  dubWords.length ? 'font-medium' : 'font-semibold',
-                  isRtl(project.settings.target) && 'arabic',
-                )}
-              >
-                {dubWords.length
-                  ? dubWords.map((w, i) => {
-                      const next = dubWords[i + 1]?.start ?? w.end
-                      const current = time >= w.start && time < Math.max(w.end, next)
-                      return (
-                        <span key={i} className={cls('transition-opacity', current ? 'font-extrabold' : time >= w.start ? 'opacity-100' : 'opacity-50')}>
-                          {w.text}{' '}
-                        </span>
-                      )
-                    })
-                  : dubSeg.translation}
-              </div>
-            )}
-          </div>
+          >
+            {isFull ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          </button>
         )}
       </div>
 
@@ -198,6 +305,9 @@ export function VideoPlayer({ project }: { project: Project }) {
           <span className="font-mono text-xs text-neutral-400">{fmtTime(time)}</span>
           <IconButton title="Toggle captions" onClick={() => setCaptions(!captions)} className={captions ? 'text-white' : ''}>
             <Captions className="size-4" />
+          </IconButton>
+          <IconButton title="Fullscreen with captions" onClick={toggleFullscreen}>
+            <Maximize2 className="size-4" />
           </IconButton>
         </div>
       </div>

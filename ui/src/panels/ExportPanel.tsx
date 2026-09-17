@@ -86,7 +86,7 @@ export function ExportPanel({ project }: { project: Project }) {
             ]}
           />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {mix.background === 'original' && (
             <Field label="Original under the dub">
               <Slider value={mix.background_volume} min={0} max={1} step={0.01} onChange={(v) => setMix({ background_volume: v })} format={(v) => `${Math.round(v * 100)}%`} />

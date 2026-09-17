@@ -64,16 +64,25 @@ def binary_with_filter(name: str) -> Optional[str]:
     return _filter_binaries[name]
 
 
-def caption_binary() -> str:
-    """ffmpeg with libass, for burning captions; raises a plain explanation when none is installed."""
-    path = binary_with_filter("ass")
-    if not path:
-        raise FFmpegError(
-            "Burning captions needs ffmpeg with libass (the 'ass' filter), and the ffmpeg found here was built without it. "
-            "Fix: pip install imageio-ffmpeg (bundles an ffmpeg with libass), or install a full ffmpeg build "
-            "(Windows: choco install ffmpeg · Linux: apt-get install ffmpeg), then export again."
-        )
-    return path
+_encoder_binaries: Optional[Dict[str, str]] = None
+
+
+def video_encoders(names: Sequence[str] = ("h264_nvenc", "libx264")) -> Dict[str, str]:
+    """For each encoder name, the first ffmpeg here that has it (PATH first, then imageio-ffmpeg)."""
+    global _encoder_binaries
+    if _encoder_binaries is None:
+        found: Dict[str, str] = {}
+        for path in _candidates():
+            try:
+                listing = subprocess.run([path, "-hide_banner", "-encoders"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20).stdout
+            except (OSError, subprocess.SubprocessError):
+                continue
+            available = {parts[1] for parts in (line.split() for line in listing.splitlines()) if len(parts) > 1}
+            for name in names:
+                if name in available:
+                    found.setdefault(name, path)
+        _encoder_binaries = found
+    return _encoder_binaries
 
 
 def run(args: Sequence[str], cwd: Optional[Path | str] = None) -> str:

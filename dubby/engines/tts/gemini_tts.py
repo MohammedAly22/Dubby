@@ -62,7 +62,7 @@ def synthesize_pcm(client: Any, model: str, voice: str, prompt: str) -> Tuple[by
         response_modalities=["AUDIO"],
         speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice))),
     )
-    response = G.with_retry(lambda: client.models.generate_content(model=model, contents=prompt, config=config))
+    response = G.with_retry(lambda: client.models.generate_content(model=model, contents=prompt, config=config), model=model)
     part = response.candidates[0].content.parts[0].inline_data
     rate = re.search(r"rate=(\d+)", part.mime_type or "")
     return part.data, int(rate.group(1)) if rate else 24000
@@ -95,7 +95,8 @@ class GeminiTTSEngine(TTSEngine):
             ParamSpec("model", "Model", "select", G.TTS_MODELS[0][0], G.model_options(G.TTS_MODELS)),
             ParamSpec("style", "Style instruction", "text", "", help="Empty = automatic for the dub language, e.g. “Say in natural Egyptian Arabic…”"),
             ParamSpec("pace_hint", "Aim for the slot length", "bool", True, help="Ask for a pace that fits each segment's duration"),
-            ParamSpec("parallel", "Parallel requests", "number", 6, min=1, max=16, step=1),
+            ParamSpec("parallel", "Parallel requests", "number", 4, min=1, max=16, step=1, help="Lowered automatically while Gemini rate-limits the model"),
+            ParamSpec("auto_fallback", "Switch model when a daily quota runs out", "bool", True, help="Per-minute limits are waited out automatically; when a model's daily quota is used up, continue with the next Gemini model"),
             normalize_param(),
         ],
     )
@@ -114,18 +115,24 @@ class GeminiTTSEngine(TTSEngine):
         voice = self.params.get("voice") if self.params.get("voice") in VOICE_NAMES else "Kore"
         model = self.params.get("model") or G.TTS_MODELS[0][0]
         items = list(items)
-        ctx.result("tts_running", {"ids": [it.id for it in items[: int(self.params.get("parallel") or 6)]]})
+        parallel = int(self.params.get("parallel") or 4)
+        models = G.fallback_models(model, G.TTS_MODELS) if self.params.get("auto_fallback", True) else [model]
+        G.set_notifier(lambda message: ctx.log(message, "warning"))
+        ctx.result("tts_running", {"ids": [it.id for it in items[:parallel]]})
+
+        def speak(name: str, item: TTSItem) -> Tuple[bytes, int]:
+            with track("tts", f"Gemini TTS · clip {item.id}", model=name, voice=voice, chars=len(item.text)):
+                return synthesize_pcm(self.client, name, voice, self._prompt(item, target))
 
         def run(item: TTSItem) -> Optional[float]:
             try:
-                with track("tts", f"Gemini TTS · clip {item.id}", model=model, voice=voice, chars=len(item.text)):
-                    pcm, rate = synthesize_pcm(self.client, model, voice, self._prompt(item, target))
+                pcm, rate = G.with_fallback(models, lambda name: speak(name, item))
                 return write_wav(item.out_path, pcm, rate)
             except Exception as exc:
                 ctx.result("tts_error", {"id": item.id, "error": f"{type(exc).__name__}: {exc}"[:500]})
                 return None
 
-        for item, duration in G.run_parallel(run, items, int(self.params.get("parallel") or 6)):
+        for item, duration in G.run_parallel(run, items, parallel):
             if duration is not None:
                 yield item, duration
 

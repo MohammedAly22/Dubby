@@ -138,8 +138,13 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     from dubby.media import ffmpeg as ff
     from dubby.media import pot
 
-    burner = ff.binary_with_filter("ass")
-    tools.add_row("caption burning (libass)", Text(burner or "missing — pip install imageio-ffmpeg", style="green" if burner else "yellow"))
+    from dubby.pipeline import captions as caption_burn
+
+    encoders = ff.video_encoders()
+    shaping = caption_burn.has_raqm()
+    caption_state = ("H.264 " + ("GPU + CPU" if "h264_nvenc" in encoders else "CPU") if "libx264" in encoders else "no libx264 — pip install imageio-ffmpeg")
+    caption_state += " · text shaping " + ("raqm" if shaping else "basic (install libraqm / fribidi for Arabic & Hindi)")
+    tools.add_row("caption burning", Text(caption_state, style="green" if "libx264" in encoders and shaping else "yellow"))
 
     helper = pot.server_dir(settings)
     if pot.is_running():

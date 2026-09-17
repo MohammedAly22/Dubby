@@ -121,12 +121,12 @@ export function ProjectPage({ id }: { id: string }) {
         </nav>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-4 lg:sticky lg:top-[72px] lg:self-start">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-[72px] lg:self-start">
           <VideoPlayer project={p} />
           <Timeline project={p} />
         </div>
-        <div className="min-w-0 rounded-2xl border border-line bg-panel p-5 backdrop-blur-xl lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto">
+        <div className="min-w-0 rounded-2xl border border-line bg-panel p-4 backdrop-blur-xl sm:p-5 lg:max-h-[calc(100vh-150px)] lg:overflow-y-auto">
           <div key={active} className="fade-in">
             {active === 'source' && <SourcePanel project={p} onNext={() => setTab('asr')} />}
             {active === 'asr' && <TranscribePanel project={p} onNext={() => setTab('translation')} />}

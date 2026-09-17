@@ -76,7 +76,7 @@ export function GeminiVoicePicker({ project }: { project: Project }) {
           ]}
         />
       </div>
-      <div className="stagger grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="stagger grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {shown.map((v, i) => {
           const active = v.name === current
           return (

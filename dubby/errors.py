@@ -62,9 +62,13 @@ def explain(error: Union[BaseException, str], family: Optional[str] = None) -> E
         )
 
     if "resource_exhausted" in low or ("429" in low and ("gemini" in low or "quota" in low or "rate" in low)):
+        daily = "daily" in low or "perday" in low.replace("_", "") or "per_day" in low
         return Explained(
-            "Gemini's rate limit or quota was reached.",
-            "Lower 'Parallel requests' in the engine parameters, wait a minute and retry, or check your quota in Google AI Studio.",
+            "Gemini's daily quota for this model is used up." if daily else "Gemini kept rate-limiting this model.",
+            "Google limits each model separately by your usage tier (requests per minute and per day) — credits don't raise these limits. "
+            + ("Pick another Gemini model (or keep 'Switch model when a daily quota runs out' on), or wait for the daily reset. "
+               if daily else "Lower 'Parallel requests' and retry: Dubby already paused and slowed down automatically. ")
+            + "See your limits at https://ai.dev/rate-limit, and upgrade the tier in Google AI Studio for higher ones.",
             "quota",
         )
 

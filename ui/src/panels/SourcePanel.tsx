@@ -46,7 +46,7 @@ export function SourcePanel({ project, onNext }: { project: Project; onNext: () 
 
       {st?.status === 'error' && src.kind === 'youtube' && <DownloadRecovery project={project} />}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Info label="Title" value={src.title ?? project.title} />
         <Info label="Channel" value={src.uploader ?? '—'} />
         <Info label="Duration" value={fmtDuration(src.duration)} />
@@ -87,7 +87,7 @@ export function SourcePanel({ project, onNext }: { project: Project; onNext: () 
         )}
         {langSt?.status === 'error' && <div className="text-xs text-neutral-400">Detection failed: {langSt.error}</div>}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Spoken language" hint="Changing it swaps in engines that support the language.">
             <Select value={project.settings.source_language} onChange={(v) => patchSettings({ source_language: v })} options={SOURCE_OPTIONS} menuWidth={280} />
           </Field>
@@ -203,7 +203,7 @@ function DownloadRecovery({ project }: { project: Project }) {
 
 function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-2xl border border-line p-3">
+    <div className="min-w-0 rounded-2xl border border-line p-3">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{label}</div>
       <div className={mono ? 'mt-1 truncate font-mono text-xs text-neutral-300' : 'mt-1 truncate text-sm'} title={value}>
         {value}

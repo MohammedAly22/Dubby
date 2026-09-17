@@ -68,7 +68,7 @@ export function RequestsView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-col gap-2 border-b border-line px-4 py-2.5">
+      <div className="flex flex-col gap-2 border-b border-line px-3 py-2.5 sm:px-4">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <Chip active={status === 'all'} onClick={() => setStatus('all')}>
             Total <b className="font-mono">{scoped.length}</b>
@@ -104,12 +104,12 @@ export function RequestsView() {
           <table className="w-full border-separate border-spacing-0">
             <thead className="sticky top-0 z-10 bg-black text-left text-[10px] tracking-wider text-neutral-600 uppercase">
               <tr>
-                <th className="w-24 px-4 py-1.5 font-semibold">Status</th>
-                <th className="w-28 py-1.5 font-semibold">Kind</th>
+                <th className="w-9 py-1.5 pl-3 font-semibold sm:w-24 sm:px-4"><span className="hidden sm:inline">Status</span></th>
+                <th className="hidden w-28 py-1.5 font-semibold sm:table-cell">Kind</th>
                 <th className="py-1.5 font-semibold">Request</th>
                 <th className="hidden w-44 py-1.5 font-semibold md:table-cell">Engine</th>
-                <th className="w-20 py-1.5 font-semibold">Started</th>
-                <th className="w-20 px-4 py-1.5 text-right font-semibold">Time</th>
+                <th className="hidden w-20 py-1.5 font-semibold sm:table-cell">Started</th>
+                <th className="w-16 px-3 py-1.5 text-right font-semibold sm:w-20 sm:px-4">Time</th>
               </tr>
             </thead>
             <tbody>
@@ -136,13 +136,13 @@ function Row({ r, now, open, onToggle }: { r: RequestEvent; now: number; open: b
         onClick={expandable ? onToggle : undefined}
         className={cls('transition-colors hover:bg-white/[.04]', expandable && 'cursor-pointer', r.level === 'call' ? 'text-neutral-400' : 'text-neutral-200', r.status === 'error' && 'text-white')}
       >
-        <td className="border-b border-line/60 px-4 py-1.5">
+        <td className="border-b border-line/60 py-1.5 pl-3 sm:px-4" title={r.status}>
           <span className="flex items-center gap-1.5">
             <StatusGlyph status={r.status} />
-            <span className={cls(r.status === 'error' && 'font-semibold')}>{r.status}</span>
+            <span className={cls('hidden sm:inline', r.status === 'error' && 'font-semibold')}>{r.status}</span>
           </span>
         </td>
-        <td className="border-b border-line/60 py-1.5 text-neutral-500">{kindLabel(r.kind)}</td>
+        <td className="hidden border-b border-line/60 py-1.5 text-neutral-500 sm:table-cell">{kindLabel(r.kind)}</td>
         <td className="max-w-0 border-b border-line/60 py-1.5 pr-3">
           <span className="flex items-center gap-1.5">
             {expandable ? <ChevronRight className={cls('size-3 shrink-0 text-neutral-600 transition-transform', open && 'rotate-90')} /> : <span className="w-3 shrink-0" />}
@@ -151,15 +151,19 @@ function Row({ r, now, open, onToggle }: { r: RequestEvent; now: number; open: b
               {r.label}
             </span>
           </span>
+          <span className="block truncate pl-[18px] text-[10px] text-neutral-600 sm:hidden">
+            {kindLabel(r.kind)} · {r.status}
+            {r.engine ? ` · ${r.engine}` : ''}
+          </span>
           {r.status === 'error' && r.error && !open && <div className="truncate pl-[18px] text-[11px] text-neutral-500">{r.error}</div>}
         </td>
         <td className="hidden truncate border-b border-line/60 py-1.5 text-neutral-500 md:table-cell">{r.engine ?? r.family ?? '—'}</td>
-        <td className="border-b border-line/60 py-1.5 text-neutral-600">{r.started || r.queued ? new Date((r.started ?? r.queued)! * 1000).toLocaleTimeString() : '—'}</td>
-        <td className="border-b border-line/60 px-4 py-1.5 text-right text-neutral-400 tabular-nums">{elapsed !== undefined && elapsed !== null ? fmtDuration(elapsed) : '—'}</td>
+        <td className="hidden border-b border-line/60 py-1.5 text-neutral-600 sm:table-cell">{r.started || r.queued ? new Date((r.started ?? r.queued)! * 1000).toLocaleTimeString() : '—'}</td>
+        <td className="border-b border-line/60 px-3 py-1.5 text-right text-neutral-400 tabular-nums sm:px-4">{elapsed !== undefined && elapsed !== null ? fmtDuration(elapsed) : '—'}</td>
       </tr>
       {open && (
         <tr className="bg-white/[.02]">
-          <td colSpan={6} className="border-b border-line/60 px-4 py-2 pl-12 text-[11px] whitespace-pre-wrap break-all text-neutral-400">
+          <td colSpan={6} className="border-b border-line/60 px-3 py-2 sm:pl-12 text-[11px] whitespace-pre-wrap break-all text-neutral-400">
             {r.error && <div className="mb-1 text-white">✖ {r.error}</div>}
             {r.detail &&
               Object.entries(r.detail).map(([k, v]) => (
