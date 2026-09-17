@@ -77,6 +77,7 @@ def render_project(project: Project, project_dir: Path, progress: ProgressFn) ->
     # --------------------------------------------------------------- dub track
     dub = np.zeros(total, dtype=np.float32)
     stats = {"placed": 0, "stretched": 0, "trimmed": 0, "max_rate": 1.0}
+    clips: List[Dict] = []
     fade = int(0.04 * MIX_SR)
     with tempfile.TemporaryDirectory(prefix="dubby-render-") as tmp:
         for i, seg in enumerate(voiced):
@@ -87,6 +88,7 @@ def render_project(project: Project, project_dir: Path, progress: ProgressFn) ->
             available = max(0.25, nxt - seg.start)
             clip = _load(clip_path, mono=True)
             length = len(clip) / MIX_SR
+            rate = 1.0
             if mix_cfg.fit_mode == "stretch" and length > available * 1.02:
                 rate = min(length / available, float(mix_cfg.max_speedup))
                 if rate > 1.01:
@@ -109,6 +111,7 @@ def render_project(project: Project, project_dir: Path, progress: ProgressFn) ->
             if end > start:
                 dub[start:end] += clip[: end - start]
                 stats["placed"] += 1
+                clips.append({"id": seg.id, "start": round(start / MIX_SR, 3), "end": round(end / MIX_SR, 3), "rate": round(rate, 3)})
             progress(0.05 + 0.6 * (i + 1) / len(voiced), f"Placed {i + 1}/{len(voiced)} dubbed clips")
 
     progress(0.7, "Mixing…")
@@ -152,5 +155,6 @@ def render_project(project: Project, project_dir: Path, progress: ProgressFn) ->
         "voice": f"render/{voice_path.name}",
         "subtitles": {k: f"render/{v}" for k, v in subtitles.items()},
         "created_at": time.time(),
+        "clips": clips,
         "stats": stats,
     }

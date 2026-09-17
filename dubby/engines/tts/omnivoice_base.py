@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 from dubby import languages as L
 from dubby.engines.asr.common import batched
 from dubby.engines.base import ParamSpec, TTSEngine, TTSItem, option
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 
 def normalize_param() -> ParamSpec:
@@ -107,7 +107,8 @@ class OmniVoiceEngine(TTSEngine):
         for batch in batched(list(items), size):
             ctx.result("tts_running", {"ids": [it.id for it in batch]})
             try:
-                audios = self._generate(batch, target)
+                with track("tts", f"{self.info.name} · batch of {len(batch)}", clips=len(batch)):
+                    audios = self._generate(batch, target)
                 pairs = list(zip(batch, audios))
             except Exception as exc:
                 if len(batch) == 1:
@@ -118,7 +119,8 @@ class OmniVoiceEngine(TTSEngine):
                 pairs = []
                 for it in batch:
                     try:
-                        pairs.append((it, self._generate([it], target)[0]))
+                        with track("tts", f"{self.info.name} · retry clip {it.id}"):
+                            pairs.append((it, self._generate([it], target)[0]))
                     except Exception as single_exc:
                         ctx.result("tts_error", {"id": it.id, "error": str(single_exc)})
             for it, wav in pairs:

@@ -23,6 +23,13 @@ from dubby.workers.protocol import decode
 PACKAGE_ROOT = str(Path(__file__).resolve().parents[2])
 
 
+JOB_KINDS = {"asr": "asr", "asr_ref": "asr", "langid": "langid", "translation": "translation", "tts": "tts",
+             "separation": "separation", "align": "alignment"}
+JOB_LABELS = {"asr": "Transcription job", "asr_ref": "Reference voice transcription", "langid": "Language detection",
+              "translation": "Translation job", "tts": "Voice generation job", "separation": "Vocal separation",
+              "align": "Caption alignment job"}
+
+
 def engine_family(engine_id: str) -> Optional[str]:
     try:
         return engine_class(engine_id).info.family
@@ -85,6 +92,7 @@ class Job:
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     status: str = "queued"
     created_at: float = field(default_factory=time.time)
+    error: Optional[str] = None
 
     def describe(self) -> Dict[str, Any]:
         return {"id": self.id, "project_id": self.project_id, "stage": self.stage, "engine": self.engine, "status": self.status, "created_at": self.created_at}
@@ -209,8 +217,29 @@ class JobManager:
         with self._cond:
             self.queue.append(job)
             self._cond.notify_all()
+        self._job_request(job, "queued")
         self.bus.publish({"type": "jobs", "jobs": self.snapshot()})
         return job
+
+    def _job_request(self, job: Job, status: str, error: Optional[str] = None) -> None:
+        """Mirror a job's lifecycle into the Requests tab."""
+        payload = job.payload or {}
+        count = len(payload.get("items") or payload.get("segments") or [])
+        label = JOB_LABELS.get(job.kind, job.kind) + (f" · {count} item{'s' if count != 1 else ''}" if count else "")
+        now = time.time()
+        event: Dict[str, Any] = {
+            "id": f"job:{job.id}", "kind": JOB_KINDS.get(job.kind, job.kind), "label": label, "level": "job", "status": status,
+            "project_id": job.project_id, "stage": job.stage, "engine": job.engine, "family": engine_family(job.engine),
+        }
+        if status == "queued":
+            event["queued"] = job.created_at
+        elif status == "running":
+            event["started"] = now
+        else:
+            event["ended"] = now
+            if error:
+                event["error"] = error[:400]
+        self.bus.request(event)
 
     def cancel(self, project_id: str, stage: Optional[str] = None) -> int:
         cancelled: List[Job] = []
@@ -223,6 +252,7 @@ class JobManager:
         for job in cancelled:
             job.status = "cancelled"
             job.handlers.on_cancel()
+            self._job_request(job, "cancelled")
         if current and current.project_id == project_id and (stage is None or current.stage == stage):
             self._cancelled_current = True
             family = engine_class(current.engine).info.family
@@ -281,7 +311,9 @@ class JobManager:
             self._cancelled_current = False
             self._finished.clear()
             job.status = "running"
+            self._job_request(job, "running")
             self.bus.publish({"type": "jobs", "jobs": self.snapshot()})
+            job_error: Optional[str] = None
             try:
                 job.handlers.on_start()
                 family = engine_class(job.engine).info.family
@@ -290,11 +322,14 @@ class JobManager:
                 self._finished.wait()
             except Exception as exc:
                 job.status = "error"
-                job.handlers.on_error(explain(exc, engine_family(job.engine)).text())
+                job_error = explain(exc, engine_family(job.engine)).text()
+                job.handlers.on_error(job_error)
             finally:
                 if self._cancelled_current and job.status not in ("done", "error"):
                     job.status = "cancelled"
                     job.handlers.on_cancel()
+                final = job.status if job.status in ("done", "error", "cancelled") else "error"
+                self._job_request(job, final, job_error or getattr(job, "error", None))
                 with self._cond:
                     self.current = None
                 self.bus.publish({"type": "jobs", "jobs": self.snapshot()})
@@ -324,6 +359,7 @@ class JobManager:
                     code = event.get("code")
                     info = explain(f"worker exited unexpectedly (code {code})", family)
                     message = info.text() if info.kind == "killed" else f"The {family} worker exited unexpectedly (code {code}). Check the logs — this is often running out of memory."
+                    job.error = message
                     job.handlers.on_error(message)
                 self._finished.set()
             return
@@ -332,6 +368,16 @@ class JobManager:
             return
         if etype == "download":
             self._on_download(family, event, job)
+            return
+        if etype == "request":
+            self.bus.request({
+                **{k: v for k, v in event.items() if k not in ("type", "task")},
+                "id": f"{family}:{event.get('id')}",
+                "family": family,
+                "project_id": job.project_id if job else None,
+                "stage": job.stage if job else None,
+                "engine": job.engine if job else None,
+            })
             return
         if not job or event.get("task") != job.id:
             return
@@ -352,6 +398,7 @@ class JobManager:
                     self.bus.log(tb, "error", job.project_id, source=f"worker:{family}")
                 message = event.get("error", "unknown error")
                 hint = event.get("hint")
+                job.error = message
                 job.handlers.on_error(f"{message} 💡 {hint}" if hint else message)
                 if kind == "cuda_fatal":
                     # a CUDA context that hit a device-side assert is unusable: restart the worker

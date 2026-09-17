@@ -45,6 +45,8 @@ export interface Segment {
   translation_source?: string | null
   translation_error?: string | null
   tts: TTSState
+  /** word timings of the dubbed speech on the rendered timeline */
+  dub_words?: Word[]
 }
 
 export interface EngineChoice {
@@ -60,6 +62,8 @@ export interface MixConfig {
   fit_mode: 'stretch' | 'trim' | 'none'
   max_speedup: number
   subtitles: boolean
+  /** captions drawn into the exported video frames */
+  burn_captions?: CaptionMode
 }
 
 export interface VoiceConfig {
@@ -128,6 +132,12 @@ export interface RenderInfo {
   subtitles: Record<string, string>
   version: number
   created_at?: number | null
+  /** where each dubbed clip sits in the render */
+  clips?: { id: string; start: number; end: number; rate: number }[]
+  /** dub caption timing: estimated from clip placement, or aligned with wav2vec2 */
+  captions?: { method?: 'estimated' | 'aligned'; aligned?: number; total?: number; version?: number }
+  /** rendered videos with burned-in captions, by mode */
+  burned?: Record<string, string>
 }
 
 export interface ExportItem {
@@ -282,4 +292,26 @@ export interface DownloadEvent {
   project_id?: string | null
   stage?: string | null
   engine?: string | null
+}
+
+export type CaptionMode = 'none' | 'original' | 'dub' | 'both'
+
+/** One tracked unit of work: a job, a VAD pass, an API call, a TTS batch, a model load… */
+export interface RequestEvent {
+  type: 'request'
+  id: string
+  kind: string
+  label: string
+  level: 'job' | 'call'
+  status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'
+  project_id?: string | null
+  stage?: string | null
+  engine?: string | null
+  family?: string | null
+  queued?: number
+  started?: number
+  ended?: number
+  duration?: number
+  error?: string | null
+  detail?: Record<string, unknown>
 }

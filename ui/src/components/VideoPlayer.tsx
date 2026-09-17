@@ -104,6 +104,13 @@ export function VideoPlayer({ project }: { project: Project }) {
   // ------------------------------------------------------------------ captions
   const idx = segmentIndexAt(project.segments, time)
   const seg = idx >= 0 ? project.segments[idx] : null
+  // in the rendered video a dub clip may sit (or run) outside its source segment: follow the clip placement
+  const dubSeg = useMemo(() => {
+    if (effectiveMode !== 'render') return seg
+    const clip = (project.render.clips ?? []).find((c) => time >= c.start && time < c.end + 0.15)
+    return clip ? (project.segments.find((s) => s.id === clip.id) ?? null) : null
+  }, [effectiveMode, seg, project.render.clips, project.segments, time])
+  const dubWords = effectiveMode === 'render' ? (dubSeg?.dub_words ?? []) : []
 
   return (
     <div className="flex flex-col gap-2">
@@ -131,9 +138,9 @@ export function VideoPlayer({ project }: { project: Project }) {
             <span className="relative">Preparing video…</span>
           </div>
         )}
-        {captions && seg && effectiveMode !== 'render' && (
+        {captions && (seg || dubSeg) && (
           <div className="pointer-events-none absolute inset-x-0 bottom-14 flex flex-col items-center gap-1 px-6">
-            {effectiveMode === 'original' && (
+            {seg && effectiveMode !== 'dub' && (
               <div className="max-w-[92%] rounded-lg bg-[#000]/75 px-3 py-1.5 text-center text-sm leading-relaxed text-[#fff] backdrop-blur" dir="auto">
                 {seg.words.length
                   ? seg.words.map((w, i) => (
@@ -144,15 +151,26 @@ export function VideoPlayer({ project }: { project: Project }) {
                   : seg.text}
               </div>
             )}
-            {seg.translation && (
+            {dubSeg?.translation && (
               <div
                 dir="auto"
                 className={cls(
-                  'bg-accent-gradient max-w-[92%] rounded-lg px-3 py-1 text-center text-[15px] font-semibold text-on-accent shadow-[0_6px_20px_-6px_rgba(155,210,60,.7)]',
+                  'bg-accent-gradient max-w-[92%] rounded-lg px-3 py-1 text-center text-[15px] text-on-accent shadow-[0_6px_20px_-6px_rgba(155,210,60,.7)]',
+                  dubWords.length ? 'font-medium' : 'font-semibold',
                   isRtl(project.settings.target) && 'arabic',
                 )}
               >
-                {seg.translation}
+                {dubWords.length
+                  ? dubWords.map((w, i) => {
+                      const next = dubWords[i + 1]?.start ?? w.end
+                      const current = time >= w.start && time < Math.max(w.end, next)
+                      return (
+                        <span key={i} className={cls('transition-opacity', current ? 'font-extrabold' : time >= w.start ? 'opacity-100' : 'opacity-50')}>
+                          {w.text}{' '}
+                        </span>
+                      )
+                    })
+                  : dubSeg.translation}
               </div>
             )}
           </div>

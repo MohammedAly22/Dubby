@@ -39,6 +39,8 @@ ENGINES: Dict[str, str] = {
     "gemini-tts": "dubby.engines.tts.gemini_tts:GeminiTTSEngine",
     # ------------------------------------------------------ language ID
     "whisper-langid": "dubby.engines.langid.whisper_langid:WhisperLangIdEngine",
+    # --------------------------------------------------------- captions
+    "caption-align": "dubby.engines.align.caption_aligner:CaptionAligner",
     # --------------------------------------------------------- separation
     "demucs": "dubby.engines.separation.demucs_engine:DemucsEngine",
 }

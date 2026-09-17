@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { api, fileUrl, wsUrl, type RunBody } from './api'
 import { playPreview } from './player'
-import type { AsrPreviewSegment, DownloadEvent, EngineChoice, EngineInfo, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, Segment } from './types'
+import type { AsrPreviewSegment, DownloadEvent, EngineChoice, EngineInfo, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Project, ProjectSummary, Recommendation, RequestEvent, Segment } from './types'
 import { debounceByKey } from './utils'
 
 export interface Toast {
@@ -48,6 +48,8 @@ interface StudioState {
   downloads: Record<string, DownloadEvent>
   /** GPU seen by the engine doctor (null until known) */
   gpu: GpuInfo | null
+  /** tracked requests (jobs, VAD, API calls, TTS batches…), by id in arrival order */
+  requests: Record<string, RequestEvent>
 
   connect: () => void
   loadProjects: (silent?: boolean) => Promise<void>
@@ -135,6 +137,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   confirmRequest: null,
   downloads: {},
   gpu: null,
+  requests: {},
   asrPreview: null,
   selectedId: null,
   clipDraft: { start: null, end: null },
@@ -327,6 +330,8 @@ const STAGE_DONE: Record<string, string> = {
   tts: '🔊 All clips generated',
   separation: '🎚️ Vocals and background separated',
   render: '🎬 Dub rendered',
+  captions: '💬 Dub captions aligned',
+  export: '📦 Captioned video exported',
 }
 const STAGE_LABEL: Record<string, string> = {
   download: 'Download',
@@ -337,6 +342,8 @@ const STAGE_LABEL: Record<string, string> = {
   tts: 'Voice generation',
   separation: 'Separation',
   render: 'Rendering',
+  captions: 'Caption alignment',
+  export: 'Export',
 }
 
 const forProject = (map: Map<string, number>, projectId: string) => [...map.keys()].filter((k) => k.startsWith(`${projectId}:`))
@@ -355,6 +362,7 @@ function notifyStage(e: any, previous: string | undefined) {
   const where = title ? ` · ${title}` : ''
   if (status === 'done') {
     if (pending.length) return // the clip / line gets its own, more specific notification
+    if (e.stage === 'export') return // the export event lists the saved files
     s.toast(`${STAGE_DONE[e.stage] ?? `${e.stage} finished`}${e.state.message ? ` — ${e.state.message}` : ''}${where}`, 'success')
   } else {
     pending.forEach((k) => pendingMap!.delete(k))
@@ -417,7 +425,22 @@ function handleEvent(e: any) {
       for (const inner of e.events) handleEvent(inner)
       break
     case 'hello':
-      useStudio.setState({ jobs: e.jobs, downloads: Object.fromEntries(((e.downloads ?? []) as DownloadEvent[]).map((d) => [d.id, d])) })
+      useStudio.setState({
+        jobs: e.jobs,
+        downloads: Object.fromEntries(((e.downloads ?? []) as DownloadEvent[]).map((d) => [d.id, d])),
+        requests: Object.fromEntries(((e.requests ?? []) as RequestEvent[]).map((r) => [r.id, r])),
+      })
+      break
+    case 'request':
+      useStudio.setState((s) => {
+        const next: Record<string, RequestEvent> = { ...s.requests, [e.id]: e as RequestEvent }
+        const ids = Object.keys(next)
+        if (ids.length > 2000) for (const id of ids.slice(0, ids.length - 2000)) delete next[id]
+        return { requests: next }
+      })
+      break
+    case 'requests_cleared':
+      useStudio.setState((s) => ({ requests: Object.fromEntries(Object.entries(s.requests).filter(([, r]) => r.status === 'running' || r.status === 'queued')) }))
       break
     case 'jobs':
       useStudio.setState({ jobs: e.jobs })
@@ -469,7 +492,7 @@ function handleEvent(e: any) {
       state.loadEngines(false)
       break
     case 'export':
-      state.toast(`Exported ${e.items.length} files`, 'success')
+      state.toast(`📦 Exported ${e.items.length} files to disk`, 'success')
       break
   }
 }

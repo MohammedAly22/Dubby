@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 from dubby.engines.asr.common import align_words, bundled_silero_vad
 from dubby.engines.base import ASREngine, EngineInfo, ParamSpec, option
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 
 class WhisperXEngine(ASREngine):
@@ -56,7 +56,8 @@ class WhisperXEngine(ASREngine):
 
         audio = whisperx.load_audio(audio_path)
         ctx.progress(0.1, "Transcribing speech…")
-        result = self.model.transcribe(audio, batch_size=int(self.params["batch_size"]), language=language)
+        with track("asr", "WhisperX transcription", seconds=round(len(audio) / 16000, 1)):
+            result = self.model.transcribe(audio, batch_size=int(self.params["batch_size"]), language=language)
         segments = [
             {"start": float(s["start"]), "end": float(s["end"]), "text": s["text"].strip(), "words": []}
             for s in result["segments"]

@@ -23,7 +23,10 @@ import json
 import os
 import sys
 import threading
-from typing import Any, Dict, Optional
+import time
+import uuid
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, Optional
 
 PREFIX = "@@DUBBY@@"
 
@@ -62,12 +65,48 @@ class Channel:
             self._out.flush()
 
 
+_current: Optional["TaskContext"] = None
+
+
+def set_current(ctx: Optional["TaskContext"]) -> None:
+    """The task the worker is running, so library code can report requests without a ctx argument."""
+    global _current
+    _current = ctx
+
+
+@contextmanager
+def track(kind: str, label: str, **detail: Any) -> Iterator[None]:
+    """Report one unit of work (a VAD pass, an API call, a TTS batch…) to the studio's Requests tab.
+
+    A no-op outside a worker task, so engines and helpers can use it unconditionally.
+    """
+    ctx = _current
+    if ctx is None:
+        yield
+        return
+    with ctx.request(kind, label, **detail):
+        yield
+
+
 class TaskContext:
     """Handed to engines so they can report progress and streaming results."""
 
     def __init__(self, channel: Channel, task_id: str):
         self._channel = channel
         self.task_id = task_id
+
+    @contextmanager
+    def request(self, kind: str, label: str, **detail: Any) -> Iterator[None]:
+        rid = uuid.uuid4().hex[:12]
+        base = {"type": "request", "task": self.task_id, "id": rid, "kind": kind, "label": label, "level": "call", "detail": detail}
+        started = time.time()
+        self._channel.send({**base, "status": "running", "started": started})
+        try:
+            yield
+        except BaseException as exc:
+            self._channel.send({**base, "status": "error", "started": started, "ended": time.time(), "error": f"{type(exc).__name__}: {exc}"[:400]})
+            raise
+        self._channel.send({**base, "status": "done", "started": started, "ended": time.time()})
 
     def progress(self, value: float, message: str = "") -> None:
         self._channel.send({"type": "progress", "task": self.task_id, "value": max(0.0, min(1.0, float(value))), "message": message})

@@ -20,7 +20,7 @@ from dubby.engines.registry import engine_class
 from dubby.languages import join_tokens
 from dubby.pipeline.chunking import build_chunks
 from dubby.workers import progress
-from dubby.workers.protocol import Channel, TaskContext
+from dubby.workers.protocol import Channel, TaskContext, set_current
 
 
 def detect_device() -> str:
@@ -87,7 +87,8 @@ class Worker:
         engine = cls(self.device, params)
         started = time.time()
         try:
-            engine.load(ctx)
+            with ctx.request("model", f"Load {cls.info.name}", device=self.device):
+                engine.load(ctx)
         except BaseException:
             # free whatever was allocated before the failure so the next engine gets a clean GPU
             try:
@@ -146,6 +147,9 @@ class Worker:
                 ctx.progress(count / total, f"Voiced {count}/{total}")
             return {"count": count}
 
+        if kind == "align":
+            return engine.align(payload, ctx)
+
         if kind == "separation":
             engine.separate(payload["audio"], payload["vocals_out"], payload["background_out"], ctx)
             return {"vocals": payload["vocals_out"], "background": payload["background_out"]}
@@ -184,6 +188,7 @@ class Worker:
             if msg.get("type") != "task":
                 continue
             self.task_id = msg.get("id")
+            set_current(TaskContext(self.channel, msg.get("id", "")))
             try:
                 data = self.run(msg)
                 self.channel.send({"type": "done", "task": msg["id"], "data": data})
@@ -196,6 +201,7 @@ class Worker:
                     self.channel.send({"type": "error", "task": msg["id"], "error": f"{type(exc).__name__}: {exc}", "traceback": traceback.format_exc()})
             finally:
                 self.task_id = None
+                set_current(None)
 
 
 def main() -> None:

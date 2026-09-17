@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDownToLine, CheckCircle2, CloudDownload, Loader2, Trash2, X, XCircle } from 'lucide-react'
+import { api } from '../api'
+import { RequestsView } from './RequestsView'
 import { useStudio } from '../store'
 import type { DownloadEvent } from '../types'
 import { cls, fmtBytes } from '../utils'
 import { IconButton, Segmented } from './ui'
 
 type Level = 'all' | 'info' | 'warning' | 'error'
+type Tab = 'logs' | 'requests'
 
 const fmtEta = (s: number) =>
   s < 60 ? `${Math.max(1, Math.ceil(s))}s` : s < 3600 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`
@@ -15,6 +18,10 @@ export function LogsDrawer() {
   const setOpen = useStudio((s) => s.setLogsOpen)
   const logs = useStudio((s) => s.logs)
   const [level, setLevel] = useState<Level>('info')
+  const [tab, setTab] = useState<Tab>('logs')
+  const requests = useStudio((s) => s.requests)
+  const requestCount = Object.keys(requests).length
+  const running = useMemo(() => Object.values(requests).filter((r) => r.status === 'running').length, [requests])
   const [follow, setFollow] = useState(true)
   const box = useRef<HTMLDivElement>(null)
 
@@ -33,7 +40,25 @@ export function LogsDrawer() {
     <div className="slide-up fixed inset-x-0 bottom-0 z-40 flex h-[42vh] flex-col border-t border-line-strong bg-black/95 backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-line px-4 py-2">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Studio logs</span>
+          <Segmented<Tab>
+            size="sm"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'logs', label: 'Logs' },
+              {
+                value: 'requests',
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    Requests
+                    <span className="font-mono text-[10px] opacity-70">{requestCount}</span>
+                    {running > 0 && <Loader2 className="size-3 animate-spin" />}
+                  </span>
+                ),
+              },
+            ]}
+          />
+          {tab === 'logs' && (
           <Segmented<Level>
             size="sm"
             value={level}
@@ -45,12 +70,18 @@ export function LogsDrawer() {
               { value: 'error', label: 'errors' },
             ]}
           />
+          )}
         </div>
         <div className="flex items-center gap-1">
-          <IconButton title="Follow" onClick={() => setFollow(!follow)} className={follow ? 'text-white' : ''}>
-            <ArrowDownToLine className="size-4" />
-          </IconButton>
-          <IconButton title="Clear" onClick={() => useStudio.setState({ logs: [] })}>
+          {tab === 'logs' && (
+            <IconButton title="Follow" onClick={() => setFollow(!follow)} className={follow ? 'text-white' : ''}>
+              <ArrowDownToLine className="size-4" />
+            </IconButton>
+          )}
+          <IconButton
+            title={tab === 'logs' ? 'Clear logs' : 'Clear finished requests'}
+            onClick={() => (tab === 'logs' ? useStudio.setState({ logs: [] }) : api.clearRequests().catch(() => {}))}
+          >
             <Trash2 className="size-4" />
           </IconButton>
           <IconButton title="Close" onClick={() => setOpen(false)}>
@@ -58,6 +89,10 @@ export function LogsDrawer() {
           </IconButton>
         </div>
       </div>
+      {tab === 'requests' ? (
+        <RequestsView />
+      ) : (
+      <>
       <Downloads />
       <div ref={box} className="flex-1 overflow-auto px-4 py-2 font-mono text-[11.5px] leading-5">
         {filtered.map((l, i) => (
@@ -72,6 +107,8 @@ export function LogsDrawer() {
         ))}
         {!filtered.length && <div className="py-6 text-neutral-600">No logs yet.</div>}
       </div>
+      </>
+      )}
     </div>
   )
 }

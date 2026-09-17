@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from dubby import languages
 
 StageName = Literal["download", "langid", "asr", "translation", "voice", "tts", "separation", "render"]
-STAGES: List[str] = ["download", "langid", "asr", "translation", "voice", "tts", "separation", "render"]
+STAGES: List[str] = ["download", "langid", "asr", "translation", "voice", "tts", "separation", "render", "captions", "export"]
 StageStatus = Literal["idle", "queued", "running", "done", "error", "cancelled"]
 
 
@@ -53,6 +53,8 @@ class Segment(BaseModel):
     translation_source: Optional[str] = None  # source text that produced `translation`
     translation_error: Optional[str] = None
     tts: TTSState = Field(default_factory=TTSState)
+    # word timings of the dubbed speech on the rendered timeline (for highlighted dub captions)
+    dub_words: List[Word] = Field(default_factory=list)
 
     @property
     def duration(self) -> float:
@@ -72,6 +74,8 @@ class MixConfig(BaseModel):
     fit_mode: Literal["stretch", "trim", "none"] = "stretch"
     max_speedup: float = 1.35
     subtitles: bool = True
+    # captions drawn into the exported video frames, with per-word highlighting
+    burn_captions: Literal["none", "original", "dub", "both"] = "none"
 
 
 class VoiceConfig(BaseModel):
@@ -147,6 +151,12 @@ class RenderInfo(BaseModel):
     subtitles: Dict[str, str] = Field(default_factory=dict)
     version: int = 0
     created_at: Optional[float] = None
+    # where each dubbed clip sits in the render: [{id, start, end, rate}]
+    clips: List[Dict[str, Any]] = Field(default_factory=list)
+    # dub caption timing: {"method": "estimated" | "aligned", "aligned": n, "total": n}
+    captions: Dict[str, Any] = Field(default_factory=dict)
+    # videos with burned-in captions, by mode ("original" | "dub" | "both")
+    burned: Dict[str, str] = Field(default_factory=dict)
 
 
 class Project(BaseModel):

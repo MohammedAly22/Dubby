@@ -16,7 +16,7 @@ from dubby import languages as L
 from dubby.engines import gemini_common as G
 from dubby.engines.base import EngineInfo, ParamSpec, TTSEngine, TTSItem, option
 from dubby.engines.tts.omnivoice_base import normalize_param
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 # (name, style, gender) — Gemini's prebuilt voices
 VOICES: List[Tuple[str, str, str]] = [
@@ -118,7 +118,8 @@ class GeminiTTSEngine(TTSEngine):
 
         def run(item: TTSItem) -> Optional[float]:
             try:
-                pcm, rate = synthesize_pcm(self.client, model, voice, self._prompt(item, target))
+                with track("tts", f"Gemini TTS · clip {item.id}", model=model, voice=voice, chars=len(item.text)):
+                    pcm, rate = synthesize_pcm(self.client, model, voice, self._prompt(item, target))
                 return write_wav(item.out_path, pcm, rate)
             except Exception as exc:
                 ctx.result("tts_error", {"id": item.id, "error": f"{type(exc).__name__}: {exc}"[:500]})

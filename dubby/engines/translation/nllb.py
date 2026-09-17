@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
 from dubby import languages as L
 from dubby.engines.asr.common import batched
 from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine, option
+from dubby.workers.protocol import track
 
 # float16 weights + beam search working memory at the default batch size
 SIZES = {
@@ -64,7 +65,7 @@ class NLLBTranslator(TranslationEngine):
         forced_bos = self.tok.convert_tokens_to_ids(L.get(target).nllb)
         for batch in batched(list(items), int(self.params["batch_size"])):
             enc = self.tok([it["text"].strip() for it in batch], return_tensors="pt", padding=True, truncation=True, max_length=512).to(self.device)
-            with torch.inference_mode():
+            with track("translation", f"NLLB translate · {len(batch)} line{'s' if len(batch) != 1 else ''}"), torch.inference_mode():
                 out = self.model.generate(**enc, forced_bos_token_id=forced_bos, num_beams=int(self.params["num_beams"]), max_new_tokens=512)
             for it, seq in zip(batch, out):
                 yield it["id"], self.tok.decode(seq, skip_special_tokens=True).strip()

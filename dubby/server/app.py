@@ -44,6 +44,7 @@ class SplitBody(BaseModel):
 
 class ExportBody(BaseModel):
     directory: Optional[str] = None
+    captions: str = "none"  # none | original | dub | both — burned into the video frames
 
 
 class RenderBody(BaseModel):
@@ -115,6 +116,8 @@ def collapse_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             return ("segment", e.get("project_id"), (e.get("segment") or {}).get("id"))
         if kind == "download":
             return ("download", e.get("id"))
+        if kind == "request":
+            return ("request", e.get("id"))
         if kind in ("jobs", "engines"):
             return (kind,)
         return None  # logs, exports, … are all kept
@@ -206,6 +209,15 @@ def create_app(studio: Studio) -> FastAPI:
     async def stop_workers():
         await run_in_threadpool(studio.jobs.stop_workers)
         return studio.jobs.snapshot()
+
+    @app.get("/api/requests")
+    async def list_requests(limit: int = 1000):
+        return list(studio.bus.requests.values())[-limit:]
+
+    @app.delete("/api/requests")
+    async def clear_requests():
+        studio.bus.clear_requests()
+        return {"ok": True}
 
     @app.get("/api/logs")
     async def logs(limit: int = 300, project_id: Optional[str] = None):
@@ -343,8 +355,13 @@ def create_app(studio: Studio) -> FastAPI:
 
     @app.post("/api/projects/{pid}/export")
     async def export(pid: str, body: ExportBody):
-        items = await run_in_threadpool(studio.export, pid, body.directory)
-        return [i.model_dump() for i in items]
+        """Copies the render to disk; with captions the burn runs in the background (stage "export")."""
+        return await run_in_threadpool(studio.export, pid, body.directory, body.captions)
+
+    @app.post("/api/projects/{pid}/captions/align")
+    async def align_captions(pid: str):
+        job = await run_in_threadpool(studio.align_captions, pid)
+        return {"queued": job is not None}
 
     @app.get("/api/projects/{pid}/files/{rel:path}")
     async def project_file(pid: str, rel: str, request: Request, download: bool = False):
@@ -371,7 +388,12 @@ def create_app(studio: Studio) -> FastAPI:
 
         recv_task = asyncio.create_task(receiver())
         try:
-            await ws.send_json({"type": "hello", "jobs": studio.jobs.snapshot(), "downloads": list(studio.bus.downloads.values())})
+            await ws.send_json({
+                "type": "hello",
+                "jobs": studio.jobs.snapshot(),
+                "downloads": list(studio.bus.downloads.values()),
+                "requests": list(studio.bus.requests.values())[-500:],
+            })
             while not recv_task.done():
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=15)

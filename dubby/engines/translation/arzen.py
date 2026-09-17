@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from dubby.engines.asr.common import batched
 from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine, quantization_param, resolve_quantization
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 ADAPTER = "ahmedheakl/arazn-llama3-english"
 BASES = {
@@ -92,7 +92,7 @@ class ArzEnTranslator(TranslationEngine):
         for batch in batched(list(items), max(1, int(self.params.get("batch_size") or 1))):
             prompts: List[str] = [PROMPT.format(text=it["text"].strip()) for it in batch]
             enc = self.tok(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.model.device)
-            with torch.inference_mode():
+            with track("translation", f"ArzEn-LLM translate · {len(batch)} line{'s' if len(batch) != 1 else ''}"), torch.inference_mode():
                 out = self.model.generate(
                     **enc,
                     max_new_tokens=int(self.params.get("max_new_tokens") or 256),

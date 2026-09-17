@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
 
 from dubby import languages as L
 from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine, option, quantization_param, resolve_quantization
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 # 7.5B parameters: 16-bit weights alone are ~15 GB, so a 16 GB T4 needs 8-bit or 4-bit.
 SIZES = {"none": 18.0, "8bit": 10.0, "4bit": 6.5}
@@ -74,7 +74,7 @@ class HunyuanMTTranslator(TranslationEngine):
             enc = self.tok(rendered, return_tensors="pt", add_special_tokens=False).to(self.model.device)
             gen: Dict[str, Any] = dict(max_new_tokens=int(self.params["max_new_tokens"]), repetition_penalty=1.05)
             gen.update(dict(do_sample=True, top_k=20, top_p=0.6, temperature=0.7) if sampling else dict(do_sample=False))
-            with torch.inference_mode():
+            with track("translation", "Hunyuan-MT translate · 1 line"), torch.inference_mode():
                 out = self.model.generate(**enc, **gen)
             text = self.tok.decode(out[0, enc["input_ids"].shape[1]:], skip_special_tokens=True).strip()
             yield item["id"], text

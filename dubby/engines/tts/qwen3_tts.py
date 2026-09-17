@@ -10,7 +10,7 @@ from dubby import languages as L
 from dubby.engines.asr.common import batched
 from dubby.engines.base import EngineInfo, ParamSpec, TTSEngine, TTSItem, option
 from dubby.engines.tts.omnivoice_base import normalize_param
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 
 class Qwen3TTSEngine(TTSEngine):
@@ -78,7 +78,8 @@ class Qwen3TTSEngine(TTSEngine):
             for batch in batched(group, int(self.params.get("batch_size", 4))):
                 ctx.result("tts_running", {"ids": [it.id for it in batch]})
                 try:
-                    wavs, sr = self._generate(batch, target)
+                    with track("tts", f"Qwen3-TTS · batch of {len(batch)}", clips=len(batch)):
+                        wavs, sr = self._generate(batch, target)
                     pairs = list(zip(batch, wavs))
                 except Exception as exc:
                     pairs = []

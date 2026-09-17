@@ -7,7 +7,7 @@ from typing import Iterator, Sequence, Tuple
 
 from dubby.engines.base import EngineInfo, ParamSpec, TTSEngine, TTSItem
 from dubby.engines.tts.omnivoice_base import normalize_param
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 SAMPLE_RATE = 24000
 
@@ -45,7 +45,8 @@ class IndicF5Engine(TTSEngine):
                 continue
             ctx.result("tts_running", {"ids": [it.id]})
             try:
-                audio = self.model(it.text, ref_audio_path=it.ref_audio, ref_text=it.ref_text)
+                with track("tts", f"IndicF5 · clip {it.id}", chars=len(it.text)):
+                    audio = self.model(it.text, ref_audio_path=it.ref_audio, ref_text=it.ref_text)
                 audio = np.asarray(audio)
                 if audio.dtype == np.int16:
                     audio = audio.astype(np.float32) / 32768.0

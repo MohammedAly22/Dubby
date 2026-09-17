@@ -19,7 +19,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 from dubby import languages as L
 from dubby.engines.asr.common import batched
 from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine, option
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 # (model id, label, approximate VRAM in GB, bitsandbytes 4-bit checkpoint)
 MODELS: List[Tuple[str, str, float, bool]] = [
@@ -190,7 +190,7 @@ class LLMTranslator(TranslationEngine):
         for batch in batched(list(items), max(1, int(self.params.get("batch_size") or 1))):
             prompts = [self._prompt(system, history, n_ctx, it) for it in batch]
             enc = self.tok(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.model.device)
-            with torch.inference_mode():
+            with track("translation", f"LLM translate · {len(batch)} line{'s' if len(batch) != 1 else ''}"), torch.inference_mode():
                 out = self.model.generate(**enc, **gen)
             width = enc["input_ids"].shape[1]
             for it, seq in zip(batch, out):

@@ -1,4 +1,4 @@
-import type { EngineCheck, EngineChoice, EngineInfo, ExportItem, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Preset, Project, ProjectSummary, Segment } from './types'
+import type { CaptionMode, EngineCheck, EngineChoice, EngineInfo, ExportItem, GpuInfo, JobsSnapshot, LanguagesPayload, LogEvent, Preset, Project, ProjectSummary, RequestEvent, Segment } from './types'
 
 const BASE = 'api'
 
@@ -29,6 +29,34 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return (type.includes('json') ? res.json() : res.text()) as Promise<T>
 }
 
+export interface UploadProgress {
+  loaded: number
+  total: number
+}
+
+/** multipart upload with byte progress (fetch can't report upload progress) */
+function upload<T>(path: string, form: FormData, onProgress?: (p: UploadProgress) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${BASE}${path}`)
+    if (onProgress) xhr.upload.onprogress = (e) => onProgress({ loaded: e.loaded, total: e.lengthComputable ? e.total : 0 })
+    xhr.onerror = () => reject(new Error('Upload failed — check that the Dubby studio is still running, then try again.'))
+    xhr.onabort = () => reject(new Error('Upload cancelled'))
+    xhr.onload = () => {
+      let body: any = null
+      try {
+        body = xhr.responseText ? JSON.parse(xhr.responseText) : null
+      } catch {
+        /* not json */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(body as T)
+      const d = body?.detail
+      reject(new Error(typeof d === 'string' ? d : d ? JSON.stringify(d) : `Upload failed (${xhr.status})`))
+    }
+    xhr.send(form)
+  })
+}
+
 const json = (method: string, body?: unknown): RequestInit => ({
   method,
   headers: { 'Content-Type': 'application/json' },
@@ -55,11 +83,14 @@ export const api = {
   removeGeminiKey: () => req<Record<string, any>>('/settings/gemini', json('DELETE')),
   geminiVoices: () => req<{ name: string; style: string; gender: 'female' | 'male' }[]>('/gemini/voices'),
   deleteCookies: () => req<Record<string, any>>('/settings/cookies', json('DELETE')),
-  replaceSource: (id: string, file: File) => {
+  replaceSource: (id: string, file: File, onProgress?: (p: UploadProgress) => void) => {
     const fd = new FormData()
     fd.append('file', file)
-    return req<Project>(`/projects/${id}/source/upload`, { method: 'POST', body: fd })
+    return upload<Project>(`/projects/${id}/source/upload`, fd, onProgress)
   },
+  requests: () => req<RequestEvent[]>('/requests'),
+  clearRequests: () => req<{ ok: boolean }>('/requests', json('DELETE')),
+  alignCaptions: (id: string) => req<{ queued: boolean }>(`/projects/${id}/captions/align`, json('POST')),
   engines: (refresh = false) => req<{ engines: EngineInfo[]; families: Record<string, any>; gpu: GpuInfo | null }>(`/engines${refresh ? '?refresh=true' : ''}`),
   checkEngine: (engine: string, params: Record<string, unknown>, source?: string | null, target?: string | null) =>
     req<EngineCheck>(`/engines/${encodeURIComponent(engine)}/check`, json('POST', { params, source: source ?? null, target: target ?? null })),
@@ -77,12 +108,12 @@ export const api = {
   projects: () => req<ProjectSummary[]>('/projects'),
   project: (id: string) => req<Project>(`/projects/${id}`),
   create: (url: string, source_language: string, target: string) => req<Project>('/projects', json('POST', { url, source_language, target })),
-  upload: (file: File, source_language: string, target: string) => {
+  upload: (file: File, source_language: string, target: string, onProgress?: (p: UploadProgress) => void) => {
     const fd = new FormData()
-    fd.append('file', file)
     fd.append('source_language', source_language)
     fd.append('target', target)
-    return req<Project>('/projects/upload', { method: 'POST', body: fd })
+    fd.append('file', file)
+    return upload<Project>('/projects/upload', fd, onProgress)
   },
   remove: (id: string) => req<{ ok: boolean }>(`/projects/${id}`, json('DELETE')),
   patchSettings: (id: string, patch: Record<string, unknown>) => req<Project>(`/projects/${id}/settings`, json('PATCH', patch)),
@@ -104,7 +135,8 @@ export const api = {
     return req<Project>(`/projects/${id}/voice/upload`, { method: 'POST', body: fd })
   },
   render: (id: string, mix?: Record<string, unknown>) => req<{ ok: boolean }>(`/projects/${id}/render`, json('POST', { mix })),
-  export: (id: string, directory?: string) => req<ExportItem[]>(`/projects/${id}/export`, json('POST', { directory: directory || null })),
+  export: (id: string, directory?: string, captions: CaptionMode = 'none') =>
+    req<{ queued: boolean; items: ExportItem[] }>(`/projects/${id}/export`, json('POST', { directory: directory || null, captions })),
 }
 
 export type { EngineChoice }

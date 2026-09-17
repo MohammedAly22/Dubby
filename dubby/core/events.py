@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from typing import Any, Callable, Deque, Dict, List, Optional, Set
 
 Event = Dict[str, Any]
@@ -20,6 +20,9 @@ class EventBus:
         self.logs: Deque[Event] = deque(maxlen=log_history)
         # in-flight model downloads, so a browser that connects mid-download sees them too
         self.downloads: Dict[str, Event] = {}
+        # every tracked request (jobs, VAD, API calls, TTS batches, renders…), newest last
+        self.requests: "OrderedDict[str, Event]" = OrderedDict()
+        self.max_requests = 2000
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
@@ -65,6 +68,27 @@ class EventBus:
             else:
                 self.downloads[event["id"]] = event
         self.publish(event)
+
+    def request(self, event: Event) -> Event:
+        """Create or update one request record (merged by id) and broadcast it."""
+        with self._lock:
+            merged = {**self.requests.get(event["id"], {}), **{k: v for k, v in event.items() if v is not None}}
+            merged["type"] = "request"
+            if merged.get("started") and merged.get("ended"):
+                merged["duration"] = round(float(merged["ended"]) - float(merged["started"]), 3)
+            self.requests[event["id"]] = merged
+            self.requests.move_to_end(event["id"])
+            while len(self.requests) > self.max_requests:
+                self.requests.popitem(last=False)
+        self.publish(dict(merged))
+        return merged
+
+    def clear_requests(self) -> None:
+        """Forget finished requests (running and queued ones stay visible)."""
+        with self._lock:
+            for rid in [k for k, v in self.requests.items() if v.get("status") not in ("running", "queued")]:
+                self.requests.pop(rid, None)
+        self.publish({"type": "requests_cleared"})
 
     def clear_downloads(self, family: str) -> None:
         """A worker died: its downloads will never report ``done``."""

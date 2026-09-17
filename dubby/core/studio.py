@@ -11,6 +11,8 @@ import shutil
 import threading
 import time
 import traceback
+import uuid
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple  # noqa: F401
@@ -29,6 +31,7 @@ from dubby.media import ffmpeg, pot, youtube
 from dubby.pipeline.chunking import fill_word_times, split_segment_words
 from dubby.text import SUPPORTED as TEXT_LANGUAGES
 from dubby.text import normalize_safe
+from dubby.pipeline import captions as caption_burn
 from dubby.pipeline.render import render_project
 from dubby.schemas import (
     EngineChoice,
@@ -146,6 +149,22 @@ class Studio:
         if (project_id, stage) in self._cancel_flags:
             self._cancel_flags.discard((project_id, stage))
             raise Cancelled()
+
+    @contextmanager
+    def track(self, project_id: Optional[str], kind: str, label: str, stage: Optional[str] = None, engine: Optional[str] = None, **detail: Any):
+        """Report studio-side work (downloads, renders, exports...) to the Requests tab."""
+        rid = f"studio:{uuid.uuid4().hex[:12]}"
+        self.bus.request({"id": rid, "kind": kind, "label": label, "level": "job", "status": "running", "started": time.time(),
+                          "project_id": project_id, "stage": stage, "engine": engine, "family": "studio", "detail": detail})
+        try:
+            yield
+        except Cancelled:
+            self.bus.request({"id": rid, "status": "cancelled", "ended": time.time()})
+            raise
+        except BaseException as exc:
+            self.bus.request({"id": rid, "status": "error", "ended": time.time(), "error": str(exc)[:400]})
+            raise
+        self.bus.request({"id": rid, "status": "done", "ended": time.time()})
 
     def _choice(self, project_id: str, stage: str, engine: Optional[str], params: Optional[Dict[str, Any]]) -> EngineChoice:
         with self.store.mutate(project_id) as p:
@@ -328,7 +347,8 @@ class Studio:
         p = self.store.create(title=Path(filename).stem)
         ext = Path(filename).suffix.lower() or ".mp4"
         dest = self.store.dir(p.id) / "source" / f"upload{ext}"
-        dest.write_bytes(data)
+        with self.track(p.id, "upload", f"Save upload · {filename}", stage="download", bytes=len(data)):
+            dest.write_bytes(data)
         with self.store.mutate(p.id) as proj:
             proj.source.kind, proj.source.video, proj.title = "upload", f"source/{dest.name}", Path(filename).stem
             proj.source.auto_detect = auto
@@ -414,20 +434,24 @@ class Studio:
 
             meta: Dict[str, Any] = {}
             if p.source.kind == "youtube":
-                meta = youtube.download(
-                    p.source.url or "", src_dir, self.settings, progress,
-                    log=lambda msg, level="info": self.bus.log(msg, level, project_id, source="download"),
-                )
+                with self.track(project_id, "download", "YouTube download", stage=stage, engine="yt-dlp", url=p.source.url):
+                    meta = youtube.download(
+                        p.source.url or "", src_dir, self.settings, progress,
+                        log=lambda msg, level="info": self.bus.log(msg, level, project_id, source="download"),
+                    )
                 video = Path(meta["video"])
             else:
                 video = self.store.path(project_id, p.source.video or "")
             self.set_stage(project_id, stage, persist=False, progress=0.87, message="Checking video codec…")
-            video = ffmpeg.ensure_browser_video(video)
+            with self.track(project_id, "ffmpeg", "Check / convert video codec", stage=stage, engine="ffmpeg"):
+                video = ffmpeg.ensure_browser_video(video)
             self._check_cancel(project_id, stage)
             self.set_stage(project_id, stage, persist=False, progress=0.92, message="Extracting 16 kHz speech track…")
-            a16 = ffmpeg.extract_audio(video, src_dir / "audio_16k.wav", 16000, 1)
+            with self.track(project_id, "ffmpeg", "Extract 16 kHz speech track", stage=stage, engine="ffmpeg"):
+                a16 = ffmpeg.extract_audio(video, src_dir / "audio_16k.wav", 16000, 1)
             self.set_stage(project_id, stage, persist=False, progress=0.96, message="Extracting 44.1 kHz mix track…")
-            hq = ffmpeg.extract_audio(video, src_dir / "audio_hq.wav", 44100, 2)
+            with self.track(project_id, "ffmpeg", "Extract 44.1 kHz mix track", stage=stage, engine="ffmpeg"):
+                hq = ffmpeg.extract_audio(video, src_dir / "audio_hq.wav", 44100, 2)
             duration = ffmpeg.duration(video)
             with self.store.mutate(project_id) as proj:
                 proj.source.video = self.store.rel(project_id, video)
@@ -680,7 +704,7 @@ class Studio:
         return {"ok": True}
 
     def cancel(self, project_id: str, stage: str) -> Dict[str, Any]:
-        if stage in ("download", "render"):
+        if stage in ("download", "render", "export"):
             st = self.store.get(project_id).stages.get(stage)
             if st and st.status == "running":
                 self._cancel_flags.add((project_id, stage))
@@ -1090,13 +1114,15 @@ class Studio:
                 self._check_cancel(project_id, "render")
                 self.set_stage(project_id, "render", persist=False, progress=v, message=m)
 
-            result = render_project(snapshot, self.store.dir(project_id), progress)
+            with self.track(project_id, "render", "Mix dub + mux video", stage="render", engine="ffmpeg", clips=sum(1 for s in snapshot.segments if s.tts.status == "done")):
+                result = render_project(snapshot, self.store.dir(project_id), progress)
             stats = result.pop("stats")
             with self.store.mutate(project_id) as p:
                 p.render = RenderInfo(**result)
             msg = f"v{result['version']} · {stats['placed']} clips" + (f" · {stats['stretched']} sped up (max ×{stats['max_rate']})" if stats["stretched"] else "") + (f" · {stats['trimmed']} trimmed" if stats["trimmed"] else "")
             self.set_stage(project_id, "render", status="done", progress=1.0, message=msg)
             self.publish_project(project_id)
+            self.align_captions(project_id)
         except Cancelled:
             self.set_stage(project_id, "render", status="cancelled", message="Cancelled")
         except Exception as exc:
@@ -1104,31 +1130,145 @@ class Studio:
             self.set_stage(project_id, "render", status="error", error=str(exc), message="Failed")
 
     # ---------------------------------------------------------------- export
-    def export(self, project_id: str, directory: Optional[str] = None) -> List[ExportItem]:
+    # --------------------------------------------------------------- captions
+    def _estimate_dub_words(self, project_id: str) -> None:
+        """Immediate dub caption timing from clip placement (refined by alignment when available)."""
+        with self.store.mutate(project_id) as p:
+            clips = {c["id"]: c for c in p.render.clips}
+            for seg in p.segments:
+                clip = clips.get(seg.id)
+                if clip and seg.translation.strip():
+                    words = caption_burn.estimate_words(seg.translation, clip["start"], clip["end"], p.settings.target)
+                    seg.dub_words = [Word(**w) for w in words]
+                else:
+                    seg.dub_words = []
+            p.render.captions = {"method": "estimated", "aligned": 0, "total": len(clips), "version": p.render.version}
+
+    def align_captions(self, project_id: str) -> Optional[Job]:
+        """Word-align the rendered dub voice track so dub captions highlight words as they are spoken."""
+        p = self.store.get(project_id)
+        if not p.render.clips or not p.render.voice:
+            return None
+        self._estimate_dub_words(project_id)
+        self.publish_project(project_id)
+        engine = "caption-align"
+        available = self._available_engines()
+        if available is not None and engine not in available:
+            self.bus.log("wav2vec2 aligner not installed: dub captions use estimated word timing", "info", project_id, source="captions")
+            self.set_stage(project_id, "captions", status="done", progress=1.0, message="Estimated word timing (aligner not installed)", engine=engine)
+            return None
+        texts = {s.id: s.translation for s in p.segments}
+        segments = [{"id": c["id"], "start": c["start"], "end": c["end"], "text": texts.get(c["id"], "")} for c in p.render.clips if texts.get(c["id"], "").strip()]
+        payload = {"audio": str(self.store.dir(project_id) / p.render.voice), "language": p.settings.target, "segments": segments}
+        version = p.render.version
+
+        def on_result(kind: str, data: Dict[str, Any]) -> None:
+            if kind != "caption_words":
+                return
+            with self.store.mutate(project_id, persist=False) as proj:
+                if proj.render.version != version:
+                    return  # a newer render replaced this one
+                try:
+                    seg = proj.segment(data["id"])
+                except KeyError:
+                    return
+                seg.dub_words = [Word(**w) for w in data.get("words", []) if w.get("start") is not None and w.get("end") is not None]
+
+        def on_done(data: Dict[str, Any]) -> None:
+            with self.store.mutate(project_id) as proj:
+                if proj.render.version == version:
+                    proj.render.captions = {"method": "aligned", "aligned": data.get("aligned", 0), "total": data.get("total", 0), "version": version}
+            self.set_stage(project_id, "captions", status="done", progress=1.0, message=f"Aligned {data.get('aligned', 0)}/{data.get('total', 0)} dub clips")
+            self.publish_project(project_id)
+
+        def on_error(error: str) -> None:
+            self.set_stage(project_id, "captions", status="error", error=error, message="Using estimated word timing")
+            self.publish_project(project_id)
+
+        handlers = JobHandlers(
+            on_start=lambda: self.set_stage(project_id, "captions", status="running", progress=0.0, message="Aligning dub captions…", engine=engine, error=None),
+            on_progress=lambda v, m: self.set_stage(project_id, "captions", persist=False, progress=v, message=m),
+            on_result=on_result,
+            on_done=on_done,
+            on_error=on_error,
+            on_cancel=lambda: self.set_stage(project_id, "captions", status="cancelled", message="Cancelled"),
+        )
+        self.set_stage(project_id, "captions", status="queued", progress=0.0, message="Queued", engine=engine, error=None)
+        return self.jobs.submit(Job(project_id, "captions", "align", engine, {}, payload, handlers))
+
+    # ---------------------------------------------------------------- export
+    def export(self, project_id: str, directory: Optional[str] = None, captions: str = "none") -> Dict[str, Any]:
         p = self.store.get(project_id)
         if not p.render.video:
             raise StudioError("Render the dubbed video first.")
+        if captions not in ("none", *caption_burn.MODES):
+            raise StudioError("Captions must be none, original, dub or both.")
         dest = Path(directory).expanduser() if directory else self.settings.export_path
         try:
             dest.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise StudioError(f"Cannot write to {dest}: {exc}") from exc
+        with self.store.mutate(project_id) as proj:
+            proj.settings.mix.burn_captions = captions  # remember the choice
+        if captions == "none":
+            items = self._copy_exports(project_id, dest, None, captions)
+            return {"queued": False, "items": [i.model_dump() for i in items]}
+        if p.stages.get("export", StageState()).status in ("running", "queued"):
+            raise StudioError("An export is already running.")
+        self.set_stage(project_id, "export", status="queued", progress=0.0, message="Queued", engine="ffmpeg", error=None)
+        self.pool.submit(self._export_with_captions, project_id, dest, captions)
+        return {"queued": True, "items": []}
+
+    def _export_with_captions(self, project_id: str, dest: Path, captions: str) -> None:
+        stage = "export"
+        try:
+            self.set_stage(project_id, stage, status="running", progress=0.0, message=f"Burning {captions} captions…")
+            if captions in ("dub", "both"):
+                # burn the word-aligned timings, not the estimates, when alignment is still running
+                while self.store.get(project_id).stages.get("captions", StageState()).status in ("running", "queued"):
+                    self._check_cancel(project_id, stage)
+                    self.set_stage(project_id, stage, persist=False, progress=0.0, message="Waiting for dub caption alignment to finish…")
+                    time.sleep(0.5)
+            snapshot = self.store.get(project_id).model_copy(deep=True)
+
+            def progress(v: float, message: str) -> None:
+                self._check_cancel(project_id, stage)
+                self.set_stage(project_id, stage, persist=False, progress=round(v * 0.95, 4), message=message)
+
+            with self.track(project_id, "export", f"Burn {captions} captions into the video", stage=stage, engine="ffmpeg libass"):
+                burned = caption_burn.burn(snapshot, self.store.dir(project_id), captions, progress)
+            rel = self.store.rel(project_id, burned)
+            with self.store.mutate(project_id) as proj:
+                proj.render.burned = {**proj.render.burned, captions: rel}
+            self.set_stage(project_id, stage, persist=False, progress=0.97, message="Copying files…")
+            items = self._copy_exports(project_id, dest, rel, captions)
+            self.set_stage(project_id, stage, status="done", progress=1.0, message=f"Exported {len(items)} files with {captions} captions")
+        except Cancelled:
+            self.set_stage(project_id, stage, status="cancelled", message="Cancelled")
+        except Exception as exc:
+            self.bus.log(traceback.format_exc(), "error", project_id, source="export")
+            self.set_stage(project_id, stage, status="error", error=explain(exc).text(), message="Failed")
+
+    def _copy_exports(self, project_id: str, dest: Path, video_rel: Optional[str], captions: str) -> List[ExportItem]:
+        p = self.store.get(project_id)
         slug = re.sub(r"[^\w\-]+", "_", p.title, flags=re.UNICODE).strip("_")[:60] or p.id
         base = f"{slug}_dubby_{p.settings.target}_v{p.render.version}"
         pdir = self.store.dir(project_id)
-        plan: Iterable[Tuple[str, Optional[str], str]] = [
-            ("video", p.render.video, f"{base}.mp4"),
+        suffix = "" if captions == "none" else f"_captions-{captions}"
+        plan: List[Tuple[str, Optional[str], str]] = [
+            ("video" + ("" if captions == "none" else f" ({captions} captions)"), video_rel or p.render.video, f"{base}{suffix}.mp4"),
             ("audio", p.render.mix, f"{base}.wav"),
-            ("subtitles (ar)", p.render.subtitles.get("ar_srt"), f"{base}.ar.srt"),
+            (f"subtitles ({p.settings.target})", p.render.subtitles.get("ar_srt"), f"{base}.{p.settings.target}.srt"),
             (f"subtitles ({p.settings.source_language})", p.render.subtitles.get("src_srt"), f"{base}.{p.settings.source_language}.srt"),
         ]
         items: List[ExportItem] = []
-        for kind, rel, name in plan:
-            if not rel or not (pdir / rel).exists():
-                continue
-            target = dest / name
-            shutil.copy2(pdir / rel, target)
-            items.append(ExportItem(kind=kind, path=str(target.resolve()), rel=rel, size=target.stat().st_size))
+        with self.track(project_id, "export", "Copy files to disk", stage="export", destination=str(dest)):
+            for kind, rel, name in plan:
+                if not rel or not (pdir / rel).exists():
+                    continue
+                target = dest / name
+                shutil.copy2(pdir / rel, target)
+                items.append(ExportItem(kind=kind, path=str(target.resolve()), rel=rel, size=target.stat().st_size))
         with self.store.mutate(project_id) as proj:
             proj.exports = items + proj.exports[:30]
         self.bus.publish({"type": "export", "project_id": project_id, "items": [i.model_dump() for i in items]})

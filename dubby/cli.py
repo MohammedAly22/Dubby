@@ -20,6 +20,7 @@ from dubby import __version__
 from dubby.config import ENGINE_FAMILIES, load_settings
 from dubby.core.reporter import TerminalReporter, banner, console
 from dubby.languages import SOURCE_CODES, TARGET_CODES
+from dubby.schemas import ExportItem
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_DIR = ROOT / "ui"
@@ -306,9 +307,15 @@ def cmd_dub(args: argparse.Namespace) -> None:
         check("tts")
         studio.render(project.id)
         check("render")
-        items = studio.export(project.id, args.export)
+        captions = getattr(args, "captions", "none") or "none"
+        result = studio.export(project.id, args.export, captions)
+        if result["queued"]:  # captions are burned in the background
+            check("export")
+            items = studio.store.get(project.id).exports[: 4]
+        else:
+            items = [ExportItem(**i) for i in result["items"]]
         for item in items:
-            console.print(Text(f"  📦 {item.kind:<16}", style="grey62") + Text(item.path, style="bold white"))
+            console.print(Text(f"  📦 {item.kind:<24}", style="grey62") + Text(item.path, style="bold white"))
     except StudioError as exc:
         console.print(f"[red]❌ {exc}[/red]")
         sys.exit(1)
@@ -375,6 +382,7 @@ def main(argv: List[str] | None = None) -> None:
     p.add_argument("--voice", default="preset:Mohamed", help="preset:NAME | auto | clip:START-END | file:PATH")
     p.add_argument("--ref-text", default="", help="transcript of the file: voice")
     p.add_argument("--export", help="export directory")
+    p.add_argument("--captions", default="none", choices=["none", "original", "dub", "both"], help="burn word-highlighted captions into the exported video")
     p.add_argument("-v", "--verbose", action="store_true")
     p.set_defaults(func=cmd_dub)
 

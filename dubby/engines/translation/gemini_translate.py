@@ -14,7 +14,7 @@ from dubby import languages as L
 from dubby.engines import gemini_common as G
 from dubby.engines.base import EngineInfo, ParamSpec, TranslationEngine
 from dubby.engines.translation.llm import DEFAULT_SYSTEM_PROMPT, PLACEHOLDERS, clean_output, render_system_prompt
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 SCHEMA = {
     "type": "OBJECT",
@@ -84,7 +84,8 @@ class GeminiTranslator(TranslationEngine):
             temperature=float(self.params.get("temperature") if self.params.get("temperature") is not None else 0.3),
             thinking_config=G.thinking_off(model),
         )
-        response = G.generate(self.client, model, json.dumps(payload, ensure_ascii=False), config)
+        with track("translation", f"Gemini translate · {len(lines)} line{'s' if len(lines) != 1 else ''}", model=model, context=len(before) + len(after)):
+            response = G.generate(self.client, model, json.dumps(payload, ensure_ascii=False), config)
         data = json.loads(response.text or "{}")
         return {str(t.get("id")): str(t.get("text", "")) for t in data.get("translations", []) if str(t.get("text", "")).strip()}
 

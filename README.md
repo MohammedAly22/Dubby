@@ -178,7 +178,7 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
     </td>
     <td valign="top">
       <h4>👀 Preview before rendering</h4>
-      <i>Dub preview</i> plays the clips in sync over the video. <i>Rendered</i> plays the final mix with embedded subtitles.
+      <i>Dub preview</i> plays the clips in sync over the video. <i>Rendered</i> plays the final mix with word-highlighted captions for both languages.
     </td>
     <td valign="top">
       <h4>🧠 Isolated model workers</h4>
@@ -211,6 +211,20 @@ Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken lang
     <td valign="top">
       <h4>🩺 Errors you can act on</h4>
       Out-of-memory, gated models, missing packages and network failures come back as a plain message with the next step. A crashed view recovers without losing your project.
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>💬 Captions burned into the video</h4>
+      After a render, wav2vec2 aligns every word of the <b>dubbed</b> speech. Export with <i>original</i>, <i>dub</i>, <i>both</i> or no captions drawn on the frames, with the same per-word highlighting as the player (right-to-left scripts included).
+    </td>
+    <td valign="top">
+      <h4>📡 Requests monitor</h4>
+      <b>Logs → Requests</b> lists every unit of work (VAD, ASR, translation calls, TTS batches, alignment, model loads, ffmpeg, renders, exports) with totals, live status, duration, engine and errors.
+    </td>
+    <td valign="top">
+      <h4>📤 Upload progress</h4>
+      Uploading a local video shows a progress bar with size, speed and time left, then <i>preparing for analysis</i> until the studio has the file.
     </td>
   </tr>
 </table>
@@ -378,14 +392,14 @@ dubby serve              # http://127.0.0.1:8765 opens automatically
 
 | Step | What you do |
 | :-: | :-- |
-| **1 · ⬇️ Source** | Paste a YouTube link (or upload a file). Leave the spoken language on **🌐 Auto-detect** and pick a dub language. After download, the detected language and its confidence appear, and the recommended engines are applied |
+| **1 · ⬇️ Source** | Paste a YouTube link (or upload a file, with a live upload progress bar). Leave the spoken language on **🌐 Auto-detect** and pick a dub language. After download, the detected language and its confidence appear, and the recommended engines are applied |
 | **2 · 🎙️ Transcribe** | The recommended engine is preselected (★ Top pick). Chunks stream in with word timings: click a word to seek, ✂️ split, and merge or delete |
 | **3 · 🌍 Translate** | Rows fill in one by one while you edit. A *source edited* badge flags stale lines, and ↻ retranslates one line |
 | **4 · 🧬 Voice** | *From this video* · *Auto per segment* · *Studio voice* · *Upload*. Clipped and uploaded references are **transcribed with the ASR engine you choose** to become the TTS reference text |
 | **5 · 🔊 Dub** | *Generate all* runs asynchronously. Listen as clips land, check the fit bar, fix lines (tashkeel bar for Arabic), ↻ regenerate, and use **Dub preview** on the video |
-| **6 · 🎬 Export** | Set the mix (ducked original / music stem / silent, levels, max speed-up, subtitles), **Render**, then download or **Export** to disk |
+| **6 · 🎬 Export** | Set the mix (ducked original / music stem / silent, levels, max speed-up, subtitle tracks), **Render**, then pick **Captions in the video** (*None · Original · Dub · Both*) and download or **Export** to disk. The dub captions are word-aligned on the rendered voice track right after each render; *Re-align* runs it again |
 
-Every action also streams to the **terminal** and the **📟 Logs** drawer.
+Every action also streams to the **terminal** and the **📟 Logs** drawer. Its **Requests** tab counts every request by status and kind (VAD, ASR, translation, TTS, alignment, model loads, renders, exports), shows what is running right now with a live timer, and expands a row for its error and details.
 
 ---
 
@@ -414,9 +428,12 @@ dubby dub "URL" --source en --target hi --asr qwen3-asr --translation indictrans
 
 # English → Egyptian Arabic with a studio voice
 dubby dub "URL" --source en --target arz --tts voicetut --voice preset:Mohamed --export ~/Videos/Dubbed
+
+# export with both caption lines burned into the video
+dubby dub "URL" --target es --captions both --export ~/Videos/Dubbed
 ```
 
-`--source` accepts `auto` or `en ar es fr it hi zh ja`. `--target` accepts `arz arb en es fr it hi zh ja`. `--voice` accepts `preset:NAME`, `auto`, `clip:START-END` or `file:PATH` (with `--ref-text`). Engines you don't pass use the recommended ones.
+`--source` accepts `auto` or `en ar es fr it hi zh ja`. `--target` accepts `arz arb en es fr it hi zh ja`. `--voice` accepts `preset:NAME`, `auto`, `clip:START-END` or `file:PATH` (with `--ref-text`). `--captions` accepts `none original dub both`. Engines you don't pass use the recommended ones.
 
 </details>
 
@@ -545,6 +562,8 @@ class MyTTS(TTSEngine):
 | `youtube token helper: not built` in `dubby doctor` | Run `dubby youtube-helper --check` (needs `node` ≥ 20, `npm` and `git`), and keep tooling current: `pip install -U "yt-dlp[default]" bgutil-ytdlp-pot-provider` |
 | `Could not resolve host: github.com` | Your network is blocking GitHub's DNS. Use another network or ask your admin |
 | Dev UI shows *backend not reachable* | Start `dubby serve`, or run `dubby dev` to launch the backend and Vite together |
+| Burned captions show empty boxes for Arabic, Hindi, Chinese or Japanese | Install the Noto fonts libass uses: `sudo apt-get install fonts-noto-core fonts-noto-cjk` (the Colab notebook does this) |
+| Dub captions say *estimated* | Word alignment needs the wav2vec2 model for the dub language (downloaded on first use). Press *Re-align* in the Export step, and check the **Requests** tab for the error |
 | Clips sound rushed | Lower *Max speed-up*, shorten the line, or raise *Max chunk* |
 | Mispronounced names | Rephrase the line (for Arabic, add tashkeel with the diacritics bar) and regenerate it |
 

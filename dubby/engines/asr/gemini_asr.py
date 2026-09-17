@@ -15,7 +15,7 @@ from dubby import languages as L
 from dubby.engines import gemini_common as G
 from dubby.engines.asr.common import align_words, load_audio, vad_regions
 from dubby.engines.base import ASREngine, EngineInfo, ParamSpec, option
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 SR = 16000
 SCHEMA = {
@@ -137,7 +137,8 @@ class GeminiASREngine(ASREngine):
             buffer = io.BytesIO()
             sf.write(buffer, audio[a:b], SR, format="FLAC")
             part = types.Part.from_bytes(data=buffer.getvalue(), mime_type="audio/flac")
-            response = G.generate(self.client, model, [part, prompt], config)
+            with track("asr", f"Gemini ASR · part {chunks.index(chunk) + 1}/{len(chunks)}", model=model, seconds=round(duration, 1)):
+                response = G.generate(self.client, model, [part, prompt], config)
             data = json.loads(response.text or "{}")
             out = []
             for seg in data.get("segments", []):

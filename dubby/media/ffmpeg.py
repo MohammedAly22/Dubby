@@ -6,7 +6,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 
 class FFmpegError(RuntimeError):
@@ -20,8 +20,11 @@ def binary(name: str = "ffmpeg") -> str:
     return path
 
 
-def run(args: Sequence[str]) -> str:
-    proc = subprocess.run([binary(), "-hide_banner", "-loglevel", "error", "-y", *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
+def run(args: Sequence[str], cwd: Optional[Path | str] = None) -> str:
+    proc = subprocess.run(
+        [binary(), "-hide_banner", "-loglevel", "error", "-y", *args],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(cwd) if cwd else None,
+    )
     if proc.returncode != 0:
         raise FFmpegError(proc.stderr.strip()[-1500:] or f"ffmpeg failed with code {proc.returncode}")
     return proc.stdout
@@ -39,6 +42,31 @@ def probe(path: Path | str) -> dict:
 
 def duration(path: Path | str) -> float:
     return float(probe(path)["format"].get("duration", 0.0))
+
+
+def video_size(path: Path | str) -> Tuple[int, int]:
+    for s in probe(path).get("streams", []):
+        if s.get("codec_type") == "video":
+            return int(s.get("width") or 1280), int(s.get("height") or 720)
+    return 1280, 720
+
+
+def run_with_progress(args: Sequence[str], total_seconds: float, progress: Callable[[float], None], cwd: Optional[Path | str] = None) -> None:
+    """Run ffmpeg, reporting 0..1 progress from its ``-progress`` stream."""
+    cmd = [binary(), "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats", *args]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", cwd=str(cwd) if cwd else None)
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        if line.startswith("out_time_us=") or line.startswith("out_time_ms="):
+            try:
+                seconds = int(line.split("=", 1)[1]) / 1_000_000
+            except ValueError:
+                continue
+            if total_seconds > 0:
+                progress(max(0.0, min(1.0, seconds / total_seconds)))
+    stderr = proc.stderr.read() if proc.stderr else ""
+    if proc.wait() != 0:
+        raise FFmpegError(stderr.strip()[-1500:] or f"ffmpeg failed with code {proc.returncode}")
 
 
 def video_codec(path: Path | str) -> Optional[str]:

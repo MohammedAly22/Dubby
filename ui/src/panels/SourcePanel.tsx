@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Cookie, Globe2, RotateCcw, Sparkles, Upload } from 'lucide-react'
 import { api } from '../api'
 import { CookiesField } from '../components/CookiesField'
+import { UploadProgressCard, advance, startUpload, type UploadState } from '../components/UploadProgress'
 import { LangLabel, SOURCE_OPTIONS, TARGET_OPTIONS } from '../components/Flags'
 import { Select } from '../components/Select'
 import { StageHeader } from '../components/StageHeader'
@@ -124,7 +125,7 @@ function DownloadRecovery({ project }: { project: Project }) {
   const toast = useStudio((s) => s.toast)
   const runStage = useStudio((s) => s.runStage)
   const fileInput = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
+  const [uploading, setUploading] = useState<UploadState | null>(null)
   const [dragging, setDragging] = useState(false)
   const [advanced, setAdvanced] = useState(false)
   const [cookies, setCookies] = useState(false)
@@ -134,14 +135,14 @@ function DownloadRecovery({ project }: { project: Project }) {
   }, [])
 
   const useFile = async (file: File) => {
-    setUploading(true)
+    setUploading(startUpload(file))
     try {
-      await api.replaceSource(project.id, file)
+      await api.replaceSource(project.id, file, (progress) => setUploading((state) => advance(state, progress)))
       toast(`Using ${file.name} as the source`, 'success')
     } catch (err: any) {
       toast(err.message, 'error')
     } finally {
-      setUploading(false)
+      setUploading(null)
     }
   }
 
@@ -168,6 +169,7 @@ function DownloadRecovery({ project }: { project: Project }) {
         <span className="text-xs text-neutral-500">Fastest fix — this project keeps its languages and engines, and the pipeline continues as usual.</span>
       </button>
       <input ref={fileInput} type="file" accept="video/*,audio/*" hidden onChange={(e) => e.target.files?.[0] && useFile(e.target.files[0])} />
+      {uploading && <UploadProgressCard state={uploading} compact />}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" icon={<RotateCcw className="size-3.5" />} onClick={() => runStage('download')}>

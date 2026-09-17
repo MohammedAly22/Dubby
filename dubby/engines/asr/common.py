@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 
 import numpy as np
 
-from dubby.workers.protocol import TaskContext
+from dubby.workers.protocol import TaskContext, track
 
 SR = 16000
 T = TypeVar("T")
@@ -43,15 +43,16 @@ def vad_regions(
     import torch
     from silero_vad import get_speech_timestamps, load_silero_vad
 
-    model = load_silero_vad()
-    stamps = get_speech_timestamps(
-        torch.from_numpy(audio),
-        model,
-        sampling_rate=sr,
-        return_seconds=True,
-        min_silence_duration_ms=min_silence_ms,
-        speech_pad_ms=speech_pad_ms,
-    )
+    with track("vad", "Voice activity detection · Silero", seconds=round(len(audio) / sr, 1)):
+        model = load_silero_vad()
+        stamps = get_speech_timestamps(
+            torch.from_numpy(audio),
+            model,
+            sampling_rate=sr,
+            return_seconds=True,
+            min_silence_duration_ms=min_silence_ms,
+            speech_pad_ms=speech_pad_ms,
+        )
     total = len(audio) / sr
     pieces: List[Tuple[float, float]] = []
     for st in stamps:
@@ -116,10 +117,11 @@ def align_words(
 
         ctx.progress(0.8, f"Loading {lang} alignment model…")
         dev = "cuda" if str(device).startswith("cuda") else "cpu"
-        model_a, metadata = whisperx.load_align_model(language_code=lang, device=dev, model_name=model_name or None)
-        ctx.progress(0.85, "Aligning words to audio…")
-        payload = [{"start": s["start"], "end": s["end"], "text": s["text"]} for s in segments]
-        result = whisperx.align(payload, model_a, metadata, audio, dev, return_char_alignments=False)
+        with track("alignment", f"Word alignment · wav2vec2 {lang}", segments=len(segments)):
+            model_a, metadata = whisperx.load_align_model(language_code=lang, device=dev, model_name=model_name or None)
+            ctx.progress(0.85, "Aligning words to audio…")
+            payload = [{"start": s["start"], "end": s["end"], "text": s["text"]} for s in segments]
+            result = whisperx.align(payload, model_a, metadata, audio, dev, return_char_alignments=False)
         del model_a
         gc.collect()
     except Exception as exc:  # alignment is an enhancement, never a hard failure

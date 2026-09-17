@@ -7,6 +7,7 @@ import { Button, StatusIcon } from '../components/ui'
 import { useStudio } from '../store'
 import type { ProjectSummary, SourceLanguage, TargetDialect } from '../types'
 import { cls, fmtDuration, timeAgo } from '../utils'
+import { UploadProgressCard, advance, startUpload, type UploadState } from '../components/UploadProgress'
 
 const PIPELINE = [
   ['download', 'Source'],
@@ -36,6 +37,7 @@ export function HomePage() {
   const [source, setSource] = useState<SourceLanguage>('auto')
   const [target, setTarget] = useState<TargetDialect>('arz')
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState<UploadState | null>(null)
   const [word, setWord] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -63,13 +65,16 @@ export function HomePage() {
 
   const upload = async (file: File) => {
     setBusy(true)
+    setUploading(startUpload(file))
     try {
-      const p = await api.upload(file, source, target)
+      const p = await api.upload(file, source, target, (progress) => setUploading((state) => advance(state, progress)))
       window.location.hash = `#/p/${p.id}`
     } catch (e: any) {
       toast(e.message, 'error')
     } finally {
       setBusy(false)
+      setUploading(null)
+      if (fileInput.current) fileInput.current.value = ''
     }
   }
 
@@ -121,7 +126,7 @@ export function HomePage() {
                   autoFocus
                 />
               </div>
-              <Button type="submit" variant="primary" size="lg" disabled={!url.trim()} loading={busy} icon={!busy ? <ArrowRight className="size-4" /> : undefined}>
+              <Button type="submit" variant="primary" size="lg" disabled={!url.trim() || !!uploading} loading={busy && !uploading} icon={!busy || uploading ?<ArrowRight className="size-4" /> : undefined}>
                 Start dubbing
               </Button>
             </div>
@@ -139,6 +144,7 @@ export function HomePage() {
               </button>
               <input ref={fileInput} type="file" accept="video/*" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
             </div>
+            {uploading && <UploadProgressCard state={uploading} />}
           </form>
         </div>
       </section>
