@@ -48,6 +48,12 @@
 
 ---
 
+## 🎥 Example Demo
+
+<video src="https://github.com/user-attachments/assets/981437ac-edd2-47b5-8893-35ddde53c55b" controls width="100%"></video>
+
+---
+
 ## 🌍 Languages & recommended engines
 
 Dubby dubs **from 8 spoken languages into 9 dub languages**. Set the spoken language to **Auto-detect**: after download, faster-whisper identifies it and every stage switches to the recommended engine for that language. The ranked recommendations appear in the UI (★ Top pick), in `dubby languages`, and in the tables below.
