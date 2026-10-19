@@ -50,7 +50,7 @@
 
 ## 🎥 Example Demo
 
-<video src="https://github.com/user-attachments/assets/981437ac-edd2-47b5-8893-35ddde53c55b" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/b3ab8713-3efb-43d9-97a8-08e1575ae5dd" controls width="100%"></video>
 
 ---
 
